@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 #-*- coding: utf-8 -*-
 
-import sys, json, re
+import winners, sys, json, re
 from urllib import request, parse
 
-# orderName - 
+DEBUG = True
+
+# orderName - название заказа
 # _orderNameMorphology - с учетом всех форм слов
 # _orderNameStrict - строгое соответствие
 # placingWayType - способ размещения заказа
@@ -18,7 +20,11 @@ from urllib import request, parse
 # currencyCode - валюта
 # _smallBisnes - для субъектов малого предпринимательства
 
-url_example = "http://zakupki.gov.ru/pgz/public/action/search/simple/run?"
+def debug_print(er):
+    global DEBUG
+    if DEBUG: print(er)
+
+url_example = "http://zakupki.gov.ru/pgz/public/action/search/simple/result?"
 
 params = {'orderName': '', '_orderNameMorphology': 'on', '_orderNameStrict': 'on', 'placingWayType': 'EF', 
     '_placementStages': 'on', '_placementStages': 'on', 
@@ -27,18 +33,22 @@ params = {'orderName': '', '_orderNameMorphology': 'on', '_orderNameStrict': 'on
     'index': 1, 'sortField': 'lastEventDate', 'descending': 'true', 'tabName': 'FO', 'lotView': 'false', 
     'pageX': '', 'pageY': ''}
 prepate_url = parse.urlencode(params, encoding="utf-8")
-# print(url_example + prepate_url)
-regex = re.compile("Размещение завершено \((\d{1,})\)",re.IGNORECASE|re.UNICODE)
+debug_print('create url:' + url_example + prepate_url)
+regex_all = re.compile(r"Размещение\s+завершено.*?\((\d+)\)",re.IGNORECASE|re.UNICODE|re.DOTALL)
+regex_id = re.compile(r'Открытый аукцион в электронной форме.*?showNotificationPrintForm.*?(\d+)\)',re.IGNORECASE|re.UNICODE|re.DOTALL)
 try:
     conn = request.urlopen(url_example + prepate_url)
     if conn.status == 200:
-        print('Get 200')
+        debug_print('Get 200')
         from_url = conn.read().decode('utf-8')
-        r = regex.search(from_url)
+        r = regex_all.search(from_url)
         allrecord = r.groups()
         if len(allrecord):
+            debug_print('all record=' + allrecord[0])     
             allrecord = int(allrecord[0])
-        print(allrecord)       
+        ids = regex_id.findall(from_url)
+        for i in ids:
+            print("id=", i)
 except Exception as e:
     print("Not connection\nError: ".format(e))
     # return result
