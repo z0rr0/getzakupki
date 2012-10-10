@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 #-*- coding: utf-8 -*-
 
-import winners, sys, json, re
+import sys, json, re
 from urllib import request, parse
+from winners import *
 
 DEBUG = True
 
@@ -24,8 +25,8 @@ def debug_print(er):
     global DEBUG
     if DEBUG: print(er)
 
-url_example = "http://zakupki.gov.ru/pgz/public/action/search/simple/result?"
 
+url_example = "http://zakupki.gov.ru/pgz/public/action/search/simple/result?"
 params = {'orderName': '', '_orderNameMorphology': 'on', '_orderNameStrict': 'on', 'placingWayType': 'EF', 
     '_placementStages': 'on', '_placementStages': 'on', 
     'placementStages': 'FO', '_placementStages': 'on', '_placementStages': 'on',
@@ -41,16 +42,20 @@ try:
     if conn.status == 200:
         debug_print('Get 200')
         from_url = conn.read().decode('utf-8')
+        # find all records
         r = regex_all.search(from_url)
         allrecord = r.groups()
         if len(allrecord):
             debug_print('all record=' + allrecord[0])     
             allrecord = int(allrecord[0])
+        if DEBUG: allrecord = 20
+        zakupki = Zakupki(allrecord)
+        # find records in page
         ids = regex_id.findall(from_url)
         for i in ids:
             print("id=", i)
 except Exception as e:
-    print("Not connection\nError: ".format(e))
+    print("Not connection\nError: {0}".format(e))
     # return result
 else:
     conn.close()
