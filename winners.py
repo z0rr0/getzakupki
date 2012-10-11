@@ -3,6 +3,62 @@
 
 import xlrd3 as xlrd
 import xlwt3 as xlwt
+from urllib import request, parse
+from urllib.error import URLError
+import configparser, re
+
+def getURL(url, code='utf-8'):
+    from_url = False
+    try:
+        conn = request.urlopen(url)
+        if conn.status == 200:
+            from_url = conn.read().decode(code)
+        else:
+            return False
+    except (URLError, ValueError, IndexError) as e:
+        print("Not connection\nError: {0}".format(e))
+    else:
+        conn.close()
+    return from_url
+
+def get_config_data(filename):
+    result = {'maxitems': 10}
+    config = configparser.ConfigParser()
+    try:
+        config.read(filename)
+        for sec in config.sections():
+            if 'maxitems' in config[sec]:
+                result['maxitems'] = int(config[sec]['maxitems'])
+    except (ValueError, KeyError, IndexError, TypeError) as er:
+        pass
+    return result
+
+def prepare_str(input_str):
+    t = re.compile(r"\s+")
+    result = t.sub("", input_str.strip())
+    return float(result.replace(",", "."))
+
+def order_info(rg, urlpattern, dataval=None, prep=False, code='utf-8'):
+    # max_sum = "http://zakupki.gov.ru/pgz/printForm?type=NOTIFICATION&id=" + str(num)
+    # rg = re.compile(r"<td.*?>.*?Начальная \(максимальная\) цена контракта.*?</td>.*?<td.*?>(.{1,15})Российский рубль")
+    if dataval:
+        from_url = dataval
+    else:
+        from_url = getURL(urlpattern, code)
+    result = False
+    found = rg.search(from_url)
+    if not from_url or not found: 
+        return False
+    result = found.groups()
+    try:
+        if prep:
+            result = prepare_str(result[0])
+        else:
+            result = result[0]
+    except (ValueError, IndexError, TypeError) as e:
+        print("Error:", e)
+    return result
+
 
 class ZakupkiBase():
     """main base class"""
