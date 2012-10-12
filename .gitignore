@@ -29,3 +29,4 @@ pip-log.txt
 # My vars
 wf
 env/*
+wf*

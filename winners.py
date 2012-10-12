@@ -5,9 +5,10 @@ import xlrd3 as xlrd
 import xlwt3 as xlwt
 from urllib import request, parse
 from urllib.error import URLError
-import configparser, re
+import configparser, re, threading, datetime
 
 def getURL(url, code='utf-8'):
+    """get data by url, encode to utf-8"""
     from_url = False
     try:
         conn = request.urlopen(url)
@@ -15,32 +16,40 @@ def getURL(url, code='utf-8'):
             from_url = conn.read().decode(code)
         else:
             return False
-    except (URLError, ValueError, IndexError) as e:
+    # except (URLError, ValueError, IndexError) as e:
+    except Exception as e:
         print("Not connection\nError: {0}".format(e))
     else:
         conn.close()
     return from_url
 
 def get_config_data(filename):
-    result = {'maxitems': 10}
+    """read config file"""
+    td = datetime.date.today()
+    deltaday = datetime.timedelta(days=3)
+    result = {'maxitems': 10, 'start':td - deltaday, 'end': td}
     config = configparser.ConfigParser()
     try:
         config.read(filename)
         for sec in config.sections():
             if 'maxitems' in config[sec]:
                 result['maxitems'] = int(config[sec]['maxitems'])
+            if 'start' in config[sec]:
+                result['start'] = datetime.datetime.strptime(config[sec]['start'], '%d.%m.%Y')
+            if 'end' in config[sec]:
+                result['end'] = datetime.datetime.strptime(config[sec]['end'], '%d.%m.%Y')
     except (ValueError, KeyError, IndexError, TypeError) as er:
         pass
     return result
 
 def prepare_str(input_str):
+    """prepare string before using"""
     t = re.compile(r"\s+")
     result = t.sub("", input_str.strip())
     return float(result.replace(",", "."))
 
 def order_info(rg, urlpattern, dataval=None, prep=False, code='utf-8'):
-    # max_sum = "http://zakupki.gov.ru/pgz/printForm?type=NOTIFICATION&id=" + str(num)
-    # rg = re.compile(r"<td.*?>.*?Начальная \(максимальная\) цена контракта.*?</td>.*?<td.*?>(.{1,15})Российский рубль")
+    """find data with regex"""
     if dataval:
         from_url = dataval
     else:
@@ -59,6 +68,19 @@ def order_info(rg, urlpattern, dataval=None, prep=False, code='utf-8'):
         print("Error:", e)
     return result
 
+def get_data_allpages(company_info, ids, urls, regexps, dates):
+    for i in ids:
+        t = threading.Thread(target=get_data_page, args=(i, company_info, urls, regexps, dates))
+        t.daemon = True
+        t.start()
+
+def get_data_page(id, company_info, urls, regexps, dates):
+    # print(type(urls), type(id))
+    datek = order_info(regexps['date'], urls + id)
+    datek = datetime.datetime.strptime(datek, '%d.%m.%Y') if datek else False
+    if datek and (dates[0] <= datek <= dates[1]):
+        company_info[id] = datek
+        # все остальные данные получаем тут
 
 class ZakupkiBase():
     """main base class"""

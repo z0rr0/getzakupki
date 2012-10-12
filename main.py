@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #-*- coding: utf-8 -*-
 
-import sys, json, re, time, datetime
+import sys, json, re, time, datetime, threading
 from urllib import parse
 from winners import *
 
@@ -47,18 +47,17 @@ def main():
         'max_sum': re.compile(r"<maxPriceXml>(.{1,50})</maxPriceXml>",re.IGNORECASE|re.UNICODE|re.DOTALL),
         'garant': re.compile(r"<guaranteeApp>.*?<amount>(.{1,50})</amount>.*?</guaranteeApp>",re.IGNORECASE|re.UNICODE|re.DOTALL),
         'date': re.compile(r"Протокол подведения итогов аукциона.*?от.*?(\d{2}.\d{2}.\d{4})</a>",re.IGNORECASE|re.UNICODE|re.DOTALL)
-        # 'max_sum': re.compile(r"<td.*?>.*?Начальная \(максимальная\) цена контракта.*?</td>.*?<td.*?>(.{1,50})Российский рубль",re.IGNORECASE|re.UNICODE|re.DOTALL)
     }
-    # regex_all = re.compile(r"Размещение\s+завершено.*?\((\d+)\)",re.IGNORECASE|re.UNICODE|re.DOTALL)
-    # regex_id = re.compile(r'Открытый аукцион в электронной форме.*?showNotificationPrintForm.*?(\d+)\)',re.IGNORECASE|re.UNICODE|re.DOTALL)
-    today = datetime.date.today()
-    todaystr = today.strftime("%d.%m.%Y")
-    todaystr = '10.10.2012'
+    # today = datetime.date.today()
+    # todaystr = today.strftime("%d.%m.%Y")
+    # todaystr = '10.10.2012'
+    company_info = {}
     try:
         i, j, page = 1, 1, 1
         time_start = time.time()
         while i <= j:
             params['index'] = page
+            prepate_url = parse.urlencode(params, encoding="utf-8")
             print("page=", page)
             from_url = getURL(url_example + prepate_url)
             if from_url:
@@ -70,21 +69,20 @@ def main():
                         j = int(allrecord[0]) if not config else config['maxitems']
                 ids = regexps['regex_id'].findall(from_url)
                 i += len(ids)
-                # link_in_page = [int(tl) for tl in ids]
-                for lp in ids:
-                    datek = order_info(regexps['date'], url_date + lp)
-                    if datek != todaystr:
-                        continue
-
-
-                    # max_sum = order_info(regexps['max_sum'], url_info + lp)
-                    # garant = order_info(regexps['garant'], url_info + lp)
-                    # print(lp, max_sum, garant, url_fullinfo + lp)
+                idss = [tl for tl in ids]
+                thread_pages = threading.Thread(target=get_data_allpages, args=(company_info, idss, url_date, regexps, (config['start'], config['end'])))
+                thread_pages.daemon = True
+                thread_pages.start()
+                thread_pages.join()
+                # max_sum = order_info(regexps['max_sum'], url_info + lp)
+                # garant = order_info(regexps['garant'], url_info + lp)
+                # print(lp, max_sum, garant, url_fullinfo + lp)
                 # print(link_in_page)
             else:
                 i += 1
                 print("Error getURL")
             page += 1
+        print('found:', len(company_info))
         print("delta time = ", time.time() - time_start)
     except (ValueError, IndexError) as e:
         print("Error: {0}".format(e))
