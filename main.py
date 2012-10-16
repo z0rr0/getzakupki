@@ -73,7 +73,9 @@ def main():
                 # thread_pages.start()
                 # wait all threads
                 # thread_pages.join()
-                print("Done page #{0} from {1}, {2} records".format(page, config['last'], len(ids_str)))
+                recordCount += len(ids_str)
+                pageCount += 1
+                print("Done page #{0} from {1}, {2} records from {3}".format(page, config['last'], len(ids_str), recordCount))
             else:
                 print("Error getURL or not found data no page={0}".format(page))
             page += 1
