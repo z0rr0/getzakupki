@@ -37,8 +37,8 @@ def main():
     }
     regexps = {'regex_all': re.compile(r"Размещение\s+завершено.*?\((\d+)\)",regex_param),
         'regex_id': re.compile(r'Открытый аукцион в электронной форме.*?showNotificationPrintForm.*?(\d+)\)',regex_param),
-        'max_sum': re.compile(r"<maxPriceXml>(.{1,50})</maxPriceXml>",regex_param),
-        'garant': re.compile(r"<guaranteeApp>.*?<amount>(.{1,50})</amount>.*?</guaranteeApp>",regex_param),
+        'max_sum': re.compile(r"<maxPriceXml>(.{1,99})</maxPriceXml>",regex_param),
+        'garant': re.compile(r"<guaranteeApp>.*?<amount>(.{1,99})</amount>.*?</guaranteeApp>",regex_param),
         'date': re.compile(r"Протокол подведения итогов аукциона.*?от.*?(\d{2}.\d{2}.\d{4})</a>",regex_param)
     }
     params = {'orderName': '', '_orderNameMorphology': 'on', '_orderNameStrict': 'on', 'placingWayType': 'EF', 
@@ -56,9 +56,9 @@ def main():
     # todaystr = '10.10.2012'
     company_info = {}
     try:
-        i, j, page = 1, 1, 1
+        i, j, page = 1, 1, config['first']
         time_start = time.time()
-        while i <= j:
+        while (i <= j and page <= config['last']):
             params['index'] = page
             prepate_url = parse.urlencode(params, encoding="utf-8")
             print("page=", page)
