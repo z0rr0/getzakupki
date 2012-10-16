@@ -29,25 +29,28 @@ def debug_print(er):
 def main():
     global DEBUG, CONFIG
     config = get_config_data(CONFIG)
-    url_example = "http://zakupki.gov.ru/pgz/public/action/search/simple/result?"
-    url_info = "http://zakupki.gov.ru/pgz/printForm?type=NOTIFICATION&id="
-    url_fullinfo = "http://zakupki.gov.ru/pgz/public/action/orders/info/common_info/show?notificationId="
-    url_date = "http://zakupki.gov.ru/pgz/public/action/orders/info/commission_work_result/show?notificationId="
+    regex_param = re.IGNORECASE|re.UNICODE|re.DOTALL
+    urls = {"base": "http://zakupki.gov.ru/pgz/public/action/search/simple/result?",
+        "xml": "http://zakupki.gov.ru/pgz/printForm?type=NOTIFICATION&id=",
+        "common": "http://zakupki.gov.ru/pgz/public/action/orders/info/common_info/show?notificationId=",
+        "protocol": "http://zakupki.gov.ru/pgz/public/action/orders/info/commission_work_result/show?notificationId=",
+    }
+    regexps = {'regex_all': re.compile(r"Размещение\s+завершено.*?\((\d+)\)",regex_param),
+        'regex_id': re.compile(r'Открытый аукцион в электронной форме.*?showNotificationPrintForm.*?(\d+)\)',regex_param),
+        'max_sum': re.compile(r"<maxPriceXml>(.{1,50})</maxPriceXml>",regex_param),
+        'garant': re.compile(r"<guaranteeApp>.*?<amount>(.{1,50})</amount>.*?</guaranteeApp>",regex_param),
+        'date': re.compile(r"Протокол подведения итогов аукциона.*?от.*?(\d{2}.\d{2}.\d{4})</a>",regex_param)
+    }
     params = {'orderName': '', '_orderNameMorphology': 'on', '_orderNameStrict': 'on', 'placingWayType': 'EF', 
         '_placementStages': 'on', '_placementStages': 'on', 
         'placementStages': 'FO', '_placementStages': 'on', '_placementStages': 'on',
         'initiatorFullName': '', 'initiatorId': '', 'priceRange': 'H', 'currencyCode': 'RUB', '_smallBisnes': 'on',
         'index': 1, 'sortField': 'lastEventDate', 'descending': 'true', 'tabName': 'FO', 'lotView': 'false', 
         'pageX': '', 'pageY': ''}
+    # NOTE: encoding - optional for this case
     prepate_url = parse.urlencode(params, encoding="utf-8")
     debug_print('create url:' + url_example + prepate_url)
     # regex
-    regexps = {'regex_all': re.compile(r"Размещение\s+завершено.*?\((\d+)\)",re.IGNORECASE|re.UNICODE|re.DOTALL),
-        'regex_id': re.compile(r'Открытый аукцион в электронной форме.*?showNotificationPrintForm.*?(\d+)\)',re.IGNORECASE|re.UNICODE|re.DOTALL),
-        'max_sum': re.compile(r"<maxPriceXml>(.{1,50})</maxPriceXml>",re.IGNORECASE|re.UNICODE|re.DOTALL),
-        'garant': re.compile(r"<guaranteeApp>.*?<amount>(.{1,50})</amount>.*?</guaranteeApp>",re.IGNORECASE|re.UNICODE|re.DOTALL),
-        'date': re.compile(r"Протокол подведения итогов аукциона.*?от.*?(\d{2}.\d{2}.\d{4})</a>",re.IGNORECASE|re.UNICODE|re.DOTALL)
-    }
     # today = datetime.date.today()
     # todaystr = today.strftime("%d.%m.%Y")
     # todaystr = '10.10.2012'

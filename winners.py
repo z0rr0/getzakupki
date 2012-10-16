@@ -7,6 +7,27 @@ from urllib import request, parse
 from urllib.error import URLError
 import configparser, re, threading, datetime
 
+def get_config_data(filename):
+    """read config file"""
+    td = datetime.date.today()
+    deltaday = datetime.timedelta(days=3)
+    result = {'first': 1, 'last': 10, 'start':td - deltaday, 'end': td}
+    config = configparser.ConfigParser()
+    try:
+        config.read(filename)
+        for sec in config.sections():
+            if 'first' in config[sec]:
+                result['first'] = int(config[sec]['first'])
+            if 'last' in config[sec]:
+                result['last'] = int(config[sec]['last'])
+            if 'start' in config[sec]:
+                result['start'] = datetime.datetime.strptime(config[sec]['start'], '%d.%m.%Y')
+            if 'end' in config[sec]:
+                result['end'] = datetime.datetime.strptime(config[sec]['end'], '%d.%m.%Y')
+    except (ValueError, KeyError, IndexError, TypeError) as er:
+        pass
+    return result
+    
 def getURL(url, code='utf-8'):
     """get data by url, encode to utf-8"""
     from_url = False
@@ -23,24 +44,6 @@ def getURL(url, code='utf-8'):
         conn.close()
     return from_url
 
-def get_config_data(filename):
-    """read config file"""
-    td = datetime.date.today()
-    deltaday = datetime.timedelta(days=3)
-    result = {'maxitems': 10, 'start':td - deltaday, 'end': td}
-    config = configparser.ConfigParser()
-    try:
-        config.read(filename)
-        for sec in config.sections():
-            if 'maxitems' in config[sec]:
-                result['maxitems'] = int(config[sec]['maxitems'])
-            if 'start' in config[sec]:
-                result['start'] = datetime.datetime.strptime(config[sec]['start'], '%d.%m.%Y')
-            if 'end' in config[sec]:
-                result['end'] = datetime.datetime.strptime(config[sec]['end'], '%d.%m.%Y')
-    except (ValueError, KeyError, IndexError, TypeError) as er:
-        pass
-    return result
 
 def prepare_str(input_str):
     """prepare string before using"""
