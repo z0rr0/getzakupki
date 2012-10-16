@@ -4,7 +4,6 @@
 import xlrd3 as xlrd
 import xlwt3 as xlwt
 from urllib import request, parse
-from urllib.error import URLError
 import configparser, re, threading, datetime
 
 def get_config_data(filename):
@@ -27,9 +26,13 @@ def get_config_data(filename):
     except (ValueError, KeyError, IndexError, TypeError) as er:
         pass
     return result
-    
+
 def getURL(url, code='utf-8'):
-    """get data by url, encode to utf-8"""
+    """get data by url, encode to utf-8
+    NOTE: may be use
+    from urllib.error import URLError
+    except (URLError, ValueError, IndexError) as e:
+    """
     from_url = False
     try:
         conn = request.urlopen(url)
@@ -37,7 +40,6 @@ def getURL(url, code='utf-8'):
             from_url = conn.read().decode(code)
         else:
             return False
-    # except (URLError, ValueError, IndexError) as e:
     except Exception as e:
         print("Not connection\nError: {0}".format(e))
     else:
