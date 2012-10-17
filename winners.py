@@ -10,7 +10,7 @@ def get_config_data(filename):
     """read config file"""
     td = datetime.date.today()
     deltaday = datetime.timedelta(days=3)
-    result = {'first': 1, 'last': 10, 'start':td - deltaday, 'end': td}
+    result = {'first': 1, 'last': 10, 'start':td - deltaday, 'end': td, 'category': 'H'}
     config = configparser.ConfigParser()
     try:
         config.read(filename)
@@ -23,6 +23,8 @@ def get_config_data(filename):
                 result['start'] = datetime.datetime.strptime(config[sec]['start'], '%d.%m.%Y')
             if 'end' in config[sec]:
                 result['end'] = datetime.datetime.strptime(config[sec]['end'], '%d.%m.%Y')
+            if 'category' in config[sec]:
+                if result['category'] in ('H', 'I'): result['category'] = config[sec]['category']
     except (ValueError, KeyError, IndexError, TypeError) as er:
         pass
     return result

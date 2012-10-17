@@ -31,6 +31,7 @@ def main():
     config = get_config_data(CONFIG)
     regex_param = re.IGNORECASE|re.UNICODE|re.DOTALL
     prepare_func = lambda x: parse.urlencode(x, encoding="utf-8")
+    # base dicts
     urls = {"base": "http://zakupki.gov.ru/pgz/public/action/search/simple/result?",
         "xml": "http://zakupki.gov.ru/pgz/printForm?type=NOTIFICATION&id=",
         "common": "http://zakupki.gov.ru/pgz/public/action/orders/info/common_info/show?notificationId=",
@@ -49,8 +50,10 @@ def main():
         'index': 1, 'sortField': 'lastEventDate', 'descending': 'true', 'tabName': 'FO', 'lotView': 'false', 
         'pageX': '', 'pageY': ''}
     # NOTE: encoding - optional for this case
-    prepate_url = prepare_func(params)
-    debug_print('create url: ' + urls['base'] + prepate_url)
+    params['priceRange'] = config['category']
+    if DEBUG:
+        prepate_url = prepare_func(params)
+        debug_print('create url: ' + urls['base'] + prepate_url)
     companies = {}
     try:
         pageCount, recordCount, page = 0, 0, config['first']
