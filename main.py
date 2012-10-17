@@ -7,6 +7,7 @@ from winners import *
 
 DEBUG = True
 CONFIG = "config.conf"
+MAX_THREADS = 6
 
 # orderName - название заказа
 # _orderNameMorphology - с учетом всех форм слов
@@ -71,11 +72,18 @@ def main():
                 # tread take: urls, regexps, ids_str, dates, companies
                 # thread return all data: companies
                 # NOTE: thread realisation
-                # thread_pages = threading.Thread(target=get_data_allpages, args=(companies, ids_str, urls, regexps, (config['start'], config['end'])))
-                # thread_pages.daemon = True
-                # thread_pages.start()
-                # wait all threads
-                # thread_pages.join()
+                i = 0
+                while i<len(ids_str):
+                    for_work = ids_str[i:i+MAX_THREADS]
+                    arg_param = (companies, ids_str, urls, regexps, (config['start'], config['end']))
+                    # create threads
+                    thread_pages = threading.Thread(target=get_data_allpages, args=arg_param)
+                    thread_pages.daemon = True
+                    thread_pages.start()
+                    # wait all threads
+                    thread_pages.join()
+                    # next list
+                    i += MAX_THREADS
                 recordCount += len(ids_str)
                 pageCount += 1
                 print("Done page #{0} from {1}, {2} records from {3}".format(page, config['last'], len(ids_str), recordCount))
@@ -83,6 +91,7 @@ def main():
                 print("Error getURL or not found data no page={0}".format(page))
             page += 1
         print("delta time = ", time.time() - time_start)
+        print(len(companies))
     except (ValueError, IndexError) as e:
         print("Error: {0}".format(e))
 

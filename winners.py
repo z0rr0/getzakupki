@@ -48,7 +48,6 @@ def getURL(url, code='utf-8'):
         conn.close()
     return from_url
 
-
 def prepare_str(input_str):
     """prepare string before using"""
     t = re.compile(r"\s+")
@@ -63,7 +62,7 @@ def order_info(rg, urlpattern, dataval=None, prep=False, code='utf-8'):
         from_url = getURL(urlpattern, code)
     result = False
     found = rg.search(from_url)
-    if not from_url or not found: 
+    if not from_url or not found:
         return False
     result = found.groups()
     try:
@@ -75,19 +74,21 @@ def order_info(rg, urlpattern, dataval=None, prep=False, code='utf-8'):
         print("Error:", e)
     return result
 
-def get_data_allpages(company_info, ids, urls, regexps, dates):
-    for i in ids:
-        t = threading.Thread(target=get_data_page, args=(i, company_info, urls, regexps, dates))
-        t.daemon = True
-        t.start()
-
-def get_data_page(id, company_info, urls, regexps, dates):
-    # print(type(urls), type(id))
-    datek = order_info(regexps['date'], urls + id)
+def get_data_page(i, companies, urls, regexps, dates):
+    datek = order_info(regexps['date'], urls['protocol'] + i)
     datek = datetime.datetime.strptime(datek, '%d.%m.%Y') if datek else False
     if datek and (dates[0] <= datek <= dates[1]):
-        company_info[id] = datek
+        companies[i] = datek
         # все остальные данные получаем тут
+    return 0
+
+def get_data_allpages(companies, ids_str, urls, regexps, dates):
+    """start threading for recive companies info"""
+    for i in ids_str:
+        t = threading.Thread(target=get_data_page, args=(i, companies, urls, regexps, dates))
+        t.daemon = True
+        t.start()
+    return 0
 
 class ZakupkiBase():
     """main base class"""
