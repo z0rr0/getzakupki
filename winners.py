@@ -63,7 +63,8 @@ def order_info(rg, urlpattern, dataval=None, prep=False, code='utf-8'):
     result = False
     found = rg.search(from_url)
     if not from_url or not found:
-        return False
+        # print("Not date in order_info:", urlpattern)
+        return False, False
     result = found.groups()
     try:
         if prep:
@@ -72,14 +73,19 @@ def order_info(rg, urlpattern, dataval=None, prep=False, code='utf-8'):
             result = result[0]
     except (ValueError, IndexError, TypeError) as e:
         print("Error:", e)
-    return result
+    return result, from_url
 
 def get_data_page(i, companies, urls, regexps, dates):
-    datek = order_info(regexps['date'], urls['protocol'] + i)
+    datek, protocols = order_info(regexps['date'], urls['protocol'] + i)
     datek = datetime.datetime.strptime(datek, '%d.%m.%Y') if datek else False
     if datek and (dates[0] <= datek <= dates[1]):
-        companies[i] = datek
-        # все остальные данные получаем тут
+        # NOTE: date is good, search any information
+        companies[i] = {}
+        companies[i]['date'] = datek
+        companies[i]['maxsum'], xmlpage = order_info(regexps['max_sum'], urls['xml'] + i, None, True, 'cp1251')
+        companies[i]['garant'], xmlpage = order_info(regexps['garant'], urls['xml'] + i, xmlpage, True, 'cp1251')
+        # TODO: create winner regex
+        # companies[i]['winner'], protocols = order_info(regexps['winner'], urls['protocol'] + i, protocols)
     return 0
 
 def get_data_allpages(companies, ids_str, urls, regexps, dates):

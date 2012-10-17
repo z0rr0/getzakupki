@@ -92,6 +92,7 @@ def main():
             page += 1
         print("delta time = ", time.time() - time_start)
         print(len(companies))
+        print(companies)
     except (ValueError, IndexError) as e:
         print("Error: {0}".format(e))
 
