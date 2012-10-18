@@ -84,6 +84,9 @@ def get_winner(regexps, from_url):
         if i[2] == '1': return {'id': i[0], 'name': unescape(i[1], {"&quot;": '"', "&nbsp;": " "})}
     return False
 
+def found_winner(winner):
+    print(winner['name'])
+
 def get_data_page(i, companies, urls, regexps, dates):
     # print(i)
     datek, protocols = order_info(regexps['date'], urls['protocol'] + i)
@@ -97,6 +100,7 @@ def get_data_page(i, companies, urls, regexps, dates):
             companies[i]['maxsum'], xmlpage = order_info(regexps['max_sum'], urls['xml'] + i, None, True, 'cp1251')
             companies[i]['garant'], xmlpage = order_info(regexps['garant'], urls['xml'] + i, xmlpage, True, 'cp1251')
             companies[i]['winner'] = winner
+            found_winner(winner)
         # TODO: create winner regex
         # companies[i]['winner'], protocols = order_info(regexps['winner'], urls['protocol'] + i, protocols)
     return 0
