@@ -42,7 +42,9 @@ def main():
         'regex_id': re.compile(r'Открытый аукцион в электронной форме.*?showNotificationPrintForm.*?(\d+)\)',regex_param),
         'max_sum': re.compile(r"<maxPriceXml>(.{1,99})</maxPriceXml>",regex_param),
         'garant': re.compile(r"<guaranteeApp>.*?<amount>(.{1,99})</amount>.*?</guaranteeApp>",regex_param),
-        'date': re.compile(r"Протокол подведения итогов аукциона.*?от.*?(\d{2}.\d{2}.\d{4})</a>",regex_param)
+        'date': re.compile(r"Протокол подведения итогов аукциона.*?от.*?(\d{2}.\d{2}.\d{4})</a>",regex_param),
+        'crean_protocol': re.compile(r"<table><tbody><tr><td><span>\s*Последнее\s+предложение.*?</table>"),
+        'find_winner': re.compile(r'<tr.*?iceDatTblRow.*?><td.*?iceDatTblCol.*?><span.*?>(.*?)</span></td><td.*?iceDatTblCol.*?><span.*?>(.*?)</span></td>.*?<span class="iceOutTxt">(\d+)</span></td></tr>'),
     }
     params = {'orderName': '', '_orderNameMorphology': 'on', '_orderNameStrict': 'on', 'placingWayType': 'EF', 
         '_placementStages': 'on', '_placementStages': 'on', 
@@ -62,7 +64,7 @@ def main():
         while (page <= config['last']):
             params['index'] = page
             prepate_url = prepare_func(params)
-            from_url = getURL(urls['base'] + prepate_url)
+            from_url = getURLcontent(urls['base'] + prepate_url)
             if from_url:
                 # NOTE: no need to seach all record
                 # refound_base = regexps['base'].search(from_url)
@@ -72,26 +74,33 @@ def main():
                 # tread take: urls, regexps, ids_str, dates, companies
                 # thread return all data: companies
                 # NOTE: thread realisation
-                i = 0
-                while i<len(ids_str):
-                    for_work = ids_str[i:i+MAX_THREADS]
-                    arg_param = (companies, ids_str, urls, regexps, (config['start'], config['end']))
-                    # create threads
-                    thread_pages = threading.Thread(target=get_data_allpages, args=arg_param)
+                for i in ids_str:
+                    thread_pages = threading.Thread(target=get_data_page, args=(i, companies, urls, regexps, (config['start'], config['end'])))
                     thread_pages.daemon = True
                     thread_pages.start()
                     # wait all threads
                     thread_pages.join()
-                    # next list
-                    i += MAX_THREADS
+                # i = 0
+                # while i<len(ids_str):
+                #     for_work = ids_str[i:i+MAX_THREADS]
+                #     arg_param = (companies, ids_str, urls, regexps, (config['start'], config['end']))
+                #     # create threads
+                #     thread_pages = threading.Thread(target=get_data_allpages, args=arg_param)
+                #     thread_pages.daemon = True
+                #     thread_pages.start()
+                #     # wait all threads
+                #     thread_pages.join()
+                #     # next list
+                #     i += MAX_THREADS
                 recordCount += len(ids_str)
                 pageCount += 1
                 print("Done page #{0} from {1}, {2} records from {3}".format(page, config['last'], len(ids_str), recordCount))
+                print(ids_str)
             else:
                 print("Error getURL or not found data no page={0}".format(page))
             page += 1
         print("delta time = ", time.time() - time_start)
-        print(len(companies))
+        print('found', len(companies))
         print(companies)
     except (ValueError, IndexError) as e:
         print("Error: {0}".format(e))

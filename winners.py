@@ -4,6 +4,7 @@
 import xlrd3 as xlrd
 import xlwt3 as xlwt
 from urllib import request, parse
+from xml.sax.saxutils import unescape
 import configparser, re, threading, datetime
 
 def get_config_data(filename):
@@ -29,7 +30,7 @@ def get_config_data(filename):
         pass
     return result
 
-def getURL(url, code='utf-8'):
+def getURLcontent(url, code='utf-8'):
     """get data by url, encode to utf-8
     NOTE: may be use
     from urllib.error import URLError
@@ -59,7 +60,7 @@ def order_info(rg, urlpattern, dataval=None, prep=False, code='utf-8'):
     if dataval:
         from_url = dataval
     else:
-        from_url = getURL(urlpattern, code)
+        from_url = getURLcontent(urlpattern, code)
     result = False
     found = rg.search(from_url)
     if not from_url or not found:
@@ -75,15 +76,27 @@ def order_info(rg, urlpattern, dataval=None, prep=False, code='utf-8'):
         print("Error:", e)
     return result, from_url
 
+def get_winner(regexps, from_url):
+    """clean table from protocol page"""
+    newcontent = regexps['crean_protocol'].sub("", from_url)
+    winners = regexps['find_winner'].findall(newcontent)
+    for i in winners:
+        if i[2] == '1': return {'id': i[0], 'name': unescape(i[1], {"&quot;": '"', "&nbsp;": " "})}
+    return False
+
 def get_data_page(i, companies, urls, regexps, dates):
+    # print(i)
     datek, protocols = order_info(regexps['date'], urls['protocol'] + i)
     datek = datetime.datetime.strptime(datek, '%d.%m.%Y') if datek else False
     if datek and (dates[0] <= datek <= dates[1]):
         # NOTE: date is good, search any information
-        companies[i] = {}
-        companies[i]['date'] = datek
-        companies[i]['maxsum'], xmlpage = order_info(regexps['max_sum'], urls['xml'] + i, None, True, 'cp1251')
-        companies[i]['garant'], xmlpage = order_info(regexps['garant'], urls['xml'] + i, xmlpage, True, 'cp1251')
+        winner = get_winner(regexps, protocols)
+        if winner:
+            companies[i] = {}
+            companies[i]['date'] = datek
+            companies[i]['maxsum'], xmlpage = order_info(regexps['max_sum'], urls['xml'] + i, None, True, 'cp1251')
+            companies[i]['garant'], xmlpage = order_info(regexps['garant'], urls['xml'] + i, xmlpage, True, 'cp1251')
+            companies[i]['winner'] = winner
         # TODO: create winner regex
         # companies[i]['winner'], protocols = order_info(regexps['winner'], urls['protocol'] + i, protocols)
     return 0
@@ -94,7 +107,8 @@ def get_data_allpages(companies, ids_str, urls, regexps, dates):
         t = threading.Thread(target=get_data_page, args=(i, companies, urls, regexps, dates))
         t.daemon = True
         t.start()
-    return 0
+        # t.join()
+    # return 0
 
 class ZakupkiBase():
     """main base class"""
