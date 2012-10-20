@@ -5,7 +5,7 @@ import re, time, threading
 from urllib import parse
 from winners import *
 
-DEBUG = True
+# DEBUG = False # primary
 CONFIG = "config.conf"
 MAX_THREADS = 6
 
@@ -23,13 +23,10 @@ MAX_THREADS = 6
 # currencyCode - валюта
 # _smallBisnes - для субъектов малого предпринимательства
 
-def debug_print(er):
-    global DEBUG
-    if DEBUG: print(er)
-
 def main():
     global DEBUG, CONFIG
     config = get_config_data(CONFIG)
+    DEBUG = config['debug']
     regex_param = re.IGNORECASE|re.UNICODE|re.DOTALL
     prepare_func = lambda x: parse.urlencode(x, encoding="utf-8")
     # base dicts
@@ -43,8 +40,9 @@ def main():
         'max_sum': re.compile(r"<maxPriceXml>(.{1,99})</maxPriceXml>",regex_param),
         'garant': re.compile(r"<guaranteeApp>.*?<amount>(.{1,99})</amount>.*?</guaranteeApp>",regex_param),
         'date': re.compile(r"Протокол подведения итогов аукциона.*?от.*?(\d{2}.\d{2}.\d{4})</a>",regex_param),
-        'crean_protocol': re.compile(r"<table><tbody><tr><td><span>\s*Последнее\s+предложение.*?</table>"),
-        'find_winner': re.compile(r'<tr.*?iceDatTblRow.*?><td.*?iceDatTblCol.*?><span.*?>(.*?)</span></td><td.*?iceDatTblCol.*?><span.*?>(.*?)</span></td>.*?<span class="iceOutTxt">(\d+)</span></td></tr>'),
+        'clean_protocol': re.compile(r"<table><tbody><tr><td><span>\s*Последнее\s+предложение.*?</table>",regex_param),
+        'clean_prot_other': re.compile(r"^.*?Результаты\s+работы\s+комиссии",regex_param),
+        'find_winner': re.compile(r'<tr.*?iceDatTblRow.*?><td.*?iceDatTblCol.*?><span.*?>(.*?)</span></td><td.*?iceDatTblCol.*?><span.*?>(.{1,1000})</span></td>.*?<span class="iceOutTxt">(\d+)</span></td></tr>',regex_param),
     }
     params = {'orderName': '', '_orderNameMorphology': 'on', '_orderNameStrict': 'on', 'placingWayType': 'EF', 
         '_placementStages': 'on', '_placementStages': 'on', 
@@ -56,7 +54,7 @@ def main():
     params['priceRange'] = config['category']
     if DEBUG:
         prepate_url = prepare_func(params)
-        debug_print('create url: ' + urls['base'] + prepate_url)
+        print('create url: ' + urls['base'] + prepate_url)
     companies = {}
     try:
         pageCount, recordCount, page = 0, 0, config['first']
@@ -75,7 +73,7 @@ def main():
                 # thread return all data: companies
                 # NOTE: thread realisation
                 for i in ids_str:
-                    thread_pages = threading.Thread(target=get_data_page, args=(i, companies, urls, regexps, (config['start'], config['end'])))
+                    thread_pages = threading.Thread(target=get_data_page, args=(i, companies, urls, regexps, (config['start'], config['end']), DEBUG))
                     thread_pages.daemon = True
                     thread_pages.start()
                     # wait all threads
