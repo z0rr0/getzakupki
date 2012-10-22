@@ -7,11 +7,17 @@ from urllib import request, parse
 from xml.sax.saxutils import unescape
 import configparser, re, threading, datetime
 
+DEBUG = False # secondary (primary in main.py)
+
+def debug_print(er, debug=None):
+    global DEBUG
+    if DEBUG: print(er)
+
 def get_config_data(filename):
     """read config file"""
-    td = datetime.date.today()
+    td = datetime.datetime.today()
     deltaday = datetime.timedelta(days=3)
-    result = {'first': 1, 'last': 10, 'start':td - deltaday, 'end': td, 'category': 'H'}
+    result = {'first': 1, 'last': 10, 'start':td - deltaday, 'end': td, 'category': 'H', 'debug': False}
     config = configparser.ConfigParser()
     try:
         config.read(filename)
@@ -26,6 +32,8 @@ def get_config_data(filename):
                 result['end'] = datetime.datetime.strptime(config[sec]['end'], '%d.%m.%Y')
             if 'category' in config[sec]:
                 if result['category'] in ('H', 'I'): result['category'] = config[sec]['category']
+            if 'debug' in config[sec]:
+                result['debug'] = config[sec].getboolean('debug')
     except (ValueError, KeyError, IndexError, TypeError) as er:
         pass
     return result
@@ -36,6 +44,7 @@ def getURLcontent(url, code='utf-8'):
     from urllib.error import URLError
     except (URLError, ValueError, IndexError) as e:
     """
+    debug_print("call: getURLcontent: " + url)
     from_url = False
     try:
         conn = request.urlopen(url)
@@ -51,12 +60,14 @@ def getURLcontent(url, code='utf-8'):
 
 def prepare_str(input_str):
     """prepare string before using"""
+    debug_print("call: prepare_str")
     t = re.compile(r"\s+")
     result = t.sub("", input_str.strip())
     return float(result.replace(",", "."))
 
 def order_info(rg, urlpattern, dataval=None, prep=False, code='utf-8'):
     """find data with regex"""
+    debug_print("call: order_info")
     if dataval:
         from_url = dataval
     else:
@@ -78,21 +89,39 @@ def order_info(rg, urlpattern, dataval=None, prep=False, code='utf-8'):
 
 def get_winner(regexps, from_url):
     """clean table from protocol page"""
-    newcontent = regexps['crean_protocol'].sub("", from_url)
+    debug_print("call: get_winner")
+    lastfound = from_url.rfind("Рейтинг</span></th></tr></thead>")
+    if lastfound >0: 
+        print('lastfound-',lastfound)
+        from_url = from_url[lastfound:]
+    # newcontent1 = regexps['clean_prot_other'].sub("", from_url)
+    f=open("wf_get_winner.log", 'w')
+    f.write(from_url)
+    f.close()
+    newcontent = regexps['clean_protocol'].sub("", from_url)
+
+
+
     winners = regexps['find_winner'].findall(newcontent)
     for i in winners:
-        if i[2] == '1': return {'id': i[0], 'name': unescape(i[1], {"&quot;": '"', "&nbsp;": " "})}
+        if i[2] == '1': 
+            return {'id': i[0], 'name': unescape(i[1], {
+                "&quot;": '"', "&nbsp;": ' ', "&ndash;": '-', "&mdash;": '-', 
+                "&laquo;": '"', "&raquo;": '"', "&lsaquo;": '"', "&rsaquo;": '"'})}
     return False
 
 def found_winner(winner):
     print(winner['name'])
 
-def get_data_page(i, companies, urls, regexps, dates):
-    # print(i)
+def get_data_page(i, companies, urls, regexps, dates, debug=False):
+    global DEBUG
+    DEBUG = debug
+    debug_print("call: get_data_page")
     datek, protocols = order_info(regexps['date'], urls['protocol'] + i)
     datek = datetime.datetime.strptime(datek, '%d.%m.%Y') if datek else False
     if datek and (dates[0] <= datek <= dates[1]):
         # NOTE: date is good, search any information
+        print("before get_winner i=", i)
         winner = get_winner(regexps, protocols)
         if winner:
             companies[i] = {}
@@ -100,7 +129,7 @@ def get_data_page(i, companies, urls, regexps, dates):
             companies[i]['maxsum'], xmlpage = order_info(regexps['max_sum'], urls['xml'] + i, None, True, 'cp1251')
             companies[i]['garant'], xmlpage = order_info(regexps['garant'], urls['xml'] + i, xmlpage, True, 'cp1251')
             companies[i]['winner'] = winner
-            found_winner(winner)
+            # found_winner(winner)
         # TODO: create winner regex
         # companies[i]['winner'], protocols = order_info(regexps['winner'], urls['protocol'] + i, protocols)
     return 0
