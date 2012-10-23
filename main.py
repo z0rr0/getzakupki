@@ -27,7 +27,8 @@ def main():
     global DEBUG, CONFIG
     config = get_config_data(CONFIG)
     DEBUG = config['debug']
-    regex_param = re.IGNORECASE|re.UNICODE|re.DOTALL
+    # regex_param = re.IGNORECASE|re.UNICODE|re.DOTALL
+    regex_param = re.UNICODE|re.DOTALL
     prepare_func = lambda x: parse.urlencode(x, encoding="utf-8")
     # base dicts
     urls = {"base": "http://zakupki.gov.ru/pgz/public/action/search/simple/result?",
@@ -35,7 +36,14 @@ def main():
         "common": "http://zakupki.gov.ru/pgz/public/action/orders/info/common_info/show?notificationId=",
         "protocol": "http://zakupki.gov.ru/pgz/public/action/orders/info/commission_work_result/show?notificationId=",
     }
-    regexps = {'base': re.compile(r"Размещение\s+завершено.*?\((\d+)\)",regex_param),
+    regexps = {
+        'get_base_page': re.compile(r"showNotificationPrintForm\(\d+\);return false;",regex_param),
+        'get_ids': re.compile(r".*?id=(\d+)$", regex_param),
+        'get_date1': re.compile(r"^redirectToAE", regex_param),
+        'get_date2': re.compile(r"Протокол подведения итогов аукциона.*?\s+от\s+(\d{2}\.\d{2}\.\d{4})", regex_param),
+        'get_winner': re.compile(r"iceDatTblRow\d+", regex_param),
+        
+        'base': re.compile(r"Размещение\s+завершено.*?\((\d+)\)",regex_param),
         'regex_id': re.compile(r'Открытый аукцион в электронной форме.*?showNotificationPrintForm.*?(\d+)\)',regex_param),
         'max_sum': re.compile(r"<maxPriceXml>(.{1,99})</maxPriceXml>",regex_param),
         'garant': re.compile(r"<guaranteeApp>.*?<amount>(.{1,99})</amount>.*?</guaranteeApp>",regex_param),
@@ -55,7 +63,7 @@ def main():
     if DEBUG:
         prepate_url = prepare_func(params)
         print('create url: ' + urls['base'] + prepate_url)
-    companies = {}
+    companies = []
     try:
         pageCount, recordCount, page = 0, 0, config['first']
         time_start = time.time()
@@ -64,35 +72,51 @@ def main():
             prepate_url = prepare_func(params)
             from_url = getURLcontent(urls['base'] + prepate_url)
             if from_url:
-                # NOTE: no need to seach all record
-                # refound_base = regexps['base'].search(from_url)
-                # allrecord = refound_base.groups()
-                ids_str = regexps['regex_id'].findall(from_url)
-                # all calculte done in treads
-                # tread take: urls, regexps, ids_str, dates, companies
-                # thread return all data: companies
-                # NOTE: thread realisation
+                ids_str = parser_main_page(regexps['get_ids'], regexps['get_base_page'], from_url)
+                if not ids_str:
+                    print("Erro in page {}".format(page))
+                    continue
                 for i in ids_str:
-                    thread_pages = threading.Thread(target=get_data_page, args=(i, companies, urls, regexps, (config['start'], config['end']), DEBUG))
-                    thread_pages.daemon = True
-                    thread_pages.start()
-                    # wait all threads
-                    thread_pages.join()
-                # i = 0
-                # while i<len(ids_str):
-                #     for_work = ids_str[i:i+MAX_THREADS]
-                #     arg_param = (companies, ids_str, urls, regexps, (config['start'], config['end']))
-                #     # create threads
-                #     thread_pages = threading.Thread(target=get_data_allpages, args=arg_param)
+                    istr = str(i)
+                    ones = Zakupki(i)
+                    protocol_page = ones.get_date(urls['protocol'] + istr,regexps['get_date1'], regexps['get_date2'])
+                    if ones.necessary_date(config['start'], config['end']):
+                        # get winner
+                        ones.get_winner(protocol_page, regexps['get_winner'])
+                        # get sums
+                        ones.get_sums(urls['xml'] + istr)
+                        companies.append(ones)
+                        print(ones.maxsum)
+
+                # # NOTE: no need to seach all record
+                # # refound_base = regexps['base'].search(from_url)
+                # # allrecord = refound_base.groups()
+                # ids_str = regexps['regex_id'].findall(from_url)
+                # # all calculte done in treads
+                # # tread take: urls, regexps, ids_str, dates, companies
+                # # thread return all data: companies
+                # # NOTE: thread realisation
+                # for i in ids_str:
+                #     thread_pages = threading.Thread(target=get_data_page, args=(i, companies, urls, regexps, (config['start'], config['end']), DEBUG))
                 #     thread_pages.daemon = True
                 #     thread_pages.start()
                 #     # wait all threads
                 #     thread_pages.join()
-                #     # next list
-                #     i += MAX_THREADS
-                recordCount += len(ids_str)
-                pageCount += 1
-                print("Done page #{0} from {1}, {2} records from {3}".format(page, config['last'], len(ids_str), recordCount))
+                # # i = 0
+                # # while i<len(ids_str):
+                # #     for_work = ids_str[i:i+MAX_THREADS]
+                # #     arg_param = (companies, ids_str, urls, regexps, (config['start'], config['end']))
+                # #     # create threads
+                # #     thread_pages = threading.Thread(target=get_data_allpages, args=arg_param)
+                # #     thread_pages.daemon = True
+                # #     thread_pages.start()
+                # #     # wait all threads
+                # #     thread_pages.join()
+                # #     # next list
+                # #     i += MAX_THREADS
+                # recordCount += len(ids_str)
+                # pageCount += 1
+                # print("Done page #{0} from {1}, {2} records from {3}".format(page, config['last'], len(ids_str), recordCount))
                 print(ids_str)
             else:
                 print("Error getURL or not found data no page={0}".format(page))

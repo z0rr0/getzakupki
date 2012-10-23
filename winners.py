@@ -3,15 +3,37 @@
 
 import xlrd3 as xlrd
 import xlwt3 as xlwt
+from bs4 import BeautifulSoup
 from urllib import request, parse
 from xml.sax.saxutils import unescape
 import configparser, re, threading, datetime
+import xml.etree.ElementTree as ET
 
 DEBUG = False # secondary (primary in main.py)
 
 def debug_print(er, debug=None):
     global DEBUG
     if DEBUG: print(er)
+
+def getURLcontent(url, code='utf-8'):
+    """get data by url, encode to utf-8
+    NOTE: may be use
+    from urllib.error import URLError
+    except (URLError, ValueError, IndexError) as e:
+    """
+    debug_print("call: getURLcontent: " + url)
+    from_url = False
+    try:
+        conn = request.urlopen(url)
+        if conn.status == 200:
+            from_url = conn.read().decode(code)
+        else:
+            return False
+    except Exception as e:
+        print("Not connection\nError: {0}".format(e))
+    else:
+        conn.close()
+    return from_url
 
 def get_config_data(filename):
     """read config file"""
@@ -38,25 +60,11 @@ def get_config_data(filename):
         pass
     return result
 
-def getURLcontent(url, code='utf-8'):
-    """get data by url, encode to utf-8
-    NOTE: may be use
-    from urllib.error import URLError
-    except (URLError, ValueError, IndexError) as e:
-    """
-    debug_print("call: getURLcontent: " + url)
-    from_url = False
-    try:
-        conn = request.urlopen(url)
-        if conn.status == 200:
-            from_url = conn.read().decode(code)
-        else:
-            return False
-    except Exception as e:
-        print("Not connection\nError: {0}".format(e))
-    else:
-        conn.close()
-    return from_url
+
+
+
+
+
 
 def prepare_str(input_str):
     """prepare string before using"""
@@ -99,9 +107,6 @@ def get_winner(regexps, from_url):
     f.write(from_url)
     f.close()
     newcontent = regexps['clean_protocol'].sub("", from_url)
-
-
-
     winners = regexps['find_winner'].findall(newcontent)
     for i in winners:
         if i[2] == '1': 
@@ -143,42 +148,43 @@ def get_data_allpages(companies, ids_str, urls, regexps, dates):
         # t.join()
     # return 0
 
+
+
+
+
+
+
+
+def parser_main_page(r, rg, from_url):
+    """get ids from main page"""
+    soup = BeautifulSoup(from_url)
+    links = soup.find_all('a', attrs={"class": "iceCmdLnk", "onclick": rg})
+    result = []
+    for link in links:
+        try:
+            g = r.search(link.attrs['href'])
+            result.append(int(g.groups()[0]))
+        except (KeyError, ValueError) as e:
+            debug_print(e)
+            return False
+    return result
+
 class ZakupkiBase():
     """main base class"""
-    def __init__(self, arg):
-        self.counter = arg
-        self.items = []
+    def __init__(self, arg=None):
+        self.id = arg
+        self.date = None
+        self.maxsum, self.garansum = 0, 0
+        self.winner = {'id': None, 'name': "", 'inn': None}
+        self.pages = {'protocol': None, 'info': None, 'xml': None}
 
     def __repr__(self):
-        return "<Zakupki object, {0} items>".format(self.counter)
+        return "<Zakupki object, id={0}>".format(self.id)
     def __str__(self):
-        return "<Zakupki object, {1} items from {0}>".format(self.counter, len(self.items))
+        return "<Zakupki object, id={0}>".format(self.id)
     def __bool__(self):
-        valid = True if self.items else False
+        valid = True if self.winner['id'] else False
         return valid
-
-    class Item():
-        """docstring for Item"""
-        def __init__(self, arg={}):
-            keys = arg.keys()
-            self.id = arg['id'] if 'id' in keys else None
-            self.link = arg['link'] if 'link' in keys else None
-            self.name = arg['name'] if 'name' in keys else None
-            self.pricemax = arg['pricemax'] if 'pricemax' in keys else None
-            self.priceob = arg['priceob'] if 'priceob' in keys else None
-            self.winname = arg['winname'] if 'winname' in keys else None
-            self.winfull = arg['winfull'] if 'winfull' in keys else None
-            self.windate = arg['windate'] if 'windate' in keys else None
-            self.wininn = arg['wininn'] if 'wininn' in keys else None
-            self.winogrn = arg['winogrn'] if 'winogrn' in keys else None 
-            self.winkpp = arg['winkpp'] if 'winkpp' in keys else None 
-        def __repr__(self):
-            return "<Item object, {0}>".format(self.id)
-        def __str__(self):
-            return "<Item object, {0}>".format(self.id)
-        def __bool__(self):
-            valid = True if self.id else False
-            return valid
 
 class Zakupki(ZakupkiBase):
     """main class"""
@@ -186,15 +192,51 @@ class Zakupki(ZakupkiBase):
         super().__init__(arg)
         self.arg = arg
 
-    def additem(self, arg):
-        self.items.append(self.Item(arg))
+    def get_date(self, url, rg, r):
+        """find date in protocol page"""
+        from_url = getURLcontent(url, 'utf-8')
+        if from_url:
+            soup = BeautifulSoup(from_url)
+            links = soup.find_all('a', attrs={"class": "iceOutLnk", "onclick": rg})
+            for link in links:
+                search_date = r.search(link.text)
+                if search_date:
+                    self.date = datetime.datetime.strptime(search_date.groups()[0], '%d.%m.%Y')
+        return from_url
+
+    def necessary_date(self, date1, date2):
+        """check date for interval"""
+        if date1.date() <= self.date.date() <= date2.date():
+            return True
+        return False
+
+    def get_winner(self, form_url, rg):
+        soup = BeautifulSoup(form_url)
+        tables = soup.find_all('table', attrs={"class": "iceDatTbl"})
+        for table in tables:
+            trs = table.find_all('tr', attrs={'class': rg})
+            for tr in trs:
+                needata = tr.find_all('td', recursive=False)
+                # winner nubmer == 1
+                if needata[5].text == '1':
+                    self.winner['id'] = needata[0].text
+                    # self.winner['name'] = needata[1].text
+                    self.winner['name'] = unescape(needata[1].text, {"&quot;": '"', "&nbsp;": ' ', "&ndash;": '-', "&mdash;": '-', "&laquo;": '"', "&raquo;": '"', "&lsaquo;": '"', "&rsaquo;": '"'})
         return 0
 
-    def print_items(self):
-        j = 1
-        for i in self.items:
-            print("{0}\t id={1}".format(j, i.id))
-            j += 1
+    def get_sums(self, url):
+        from_url = getURLcontent(url, 'cp1251')
+        if from_url:
+            soup = BeautifulSoup(from_url)
+            # maxsum = soup.find_all('name')
+            # print(soup.prettify())
+            # if maxsum: self.maxsum = prepare_str(maxsum)
+            # garant
+            # garant = soup.find_all('guaranteeApp')
+            # complex_garant = False
+            # for 
+        return 0
+
 
             
         
