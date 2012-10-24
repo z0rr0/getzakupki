@@ -42,15 +42,8 @@ def main():
         'get_date1': re.compile(r"^redirectToAE", regex_param),
         'get_date2': re.compile(r"Протокол подведения итогов аукциона.*?\s+от\s+(\d{2}\.\d{2}\.\d{4})", regex_param),
         'get_winner': re.compile(r"iceDatTblRow\d+", regex_param),
-        
-        'base': re.compile(r"Размещение\s+завершено.*?\((\d+)\)",regex_param),
-        'regex_id': re.compile(r'Открытый аукцион в электронной форме.*?showNotificationPrintForm.*?(\d+)\)',regex_param),
         'max_sum': re.compile(r"<maxPriceXml>(.{1,99})</maxPriceXml>",regex_param),
         'garant': re.compile(r"<guaranteeApp>.*?<amount>(.{1,99})</amount>.*?</guaranteeApp>",regex_param),
-        'date': re.compile(r"Протокол подведения итогов аукциона.*?от.*?(\d{2}.\d{2}.\d{4})</a>",regex_param),
-        'clean_protocol': re.compile(r"<table><tbody><tr><td><span>\s*Последнее\s+предложение.*?</table>",regex_param),
-        'clean_prot_other': re.compile(r"^.*?Результаты\s+работы\s+комиссии",regex_param),
-        'find_winner': re.compile(r'<tr.*?iceDatTblRow.*?><td.*?iceDatTblCol.*?><span.*?>(.*?)</span></td><td.*?iceDatTblCol.*?><span.*?>(.{1,1000})</span></td>.*?<span class="iceOutTxt">(\d+)</span></td></tr>',regex_param),
     }
     params = {'orderName': '', '_orderNameMorphology': 'on', '_orderNameStrict': 'on', 'placingWayType': 'EF', 
         '_placementStages': 'on', '_placementStages': 'on', 
@@ -84,39 +77,9 @@ def main():
                         # get winner
                         ones.get_winner(protocol_page, regexps['get_winner'])
                         # get sums
-                        ones.get_sums(urls['xml'] + istr)
+                        ones.get_sums_xml(urls['xml'] + istr)
                         companies.append(ones)
-                        print(ones.maxsum)
-
-                # # NOTE: no need to seach all record
-                # # refound_base = regexps['base'].search(from_url)
-                # # allrecord = refound_base.groups()
-                # ids_str = regexps['regex_id'].findall(from_url)
-                # # all calculte done in treads
-                # # tread take: urls, regexps, ids_str, dates, companies
-                # # thread return all data: companies
-                # # NOTE: thread realisation
-                # for i in ids_str:
-                #     thread_pages = threading.Thread(target=get_data_page, args=(i, companies, urls, regexps, (config['start'], config['end']), DEBUG))
-                #     thread_pages.daemon = True
-                #     thread_pages.start()
-                #     # wait all threads
-                #     thread_pages.join()
-                # # i = 0
-                # # while i<len(ids_str):
-                # #     for_work = ids_str[i:i+MAX_THREADS]
-                # #     arg_param = (companies, ids_str, urls, regexps, (config['start'], config['end']))
-                # #     # create threads
-                # #     thread_pages = threading.Thread(target=get_data_allpages, args=arg_param)
-                # #     thread_pages.daemon = True
-                # #     thread_pages.start()
-                # #     # wait all threads
-                # #     thread_pages.join()
-                # #     # next list
-                # #     i += MAX_THREADS
-                # recordCount += len(ids_str)
-                # pageCount += 1
-                # print("Done page #{0} from {1}, {2} records from {3}".format(page, config['last'], len(ids_str), recordCount))
+                        print(ones.id, ones.winner['name'])
                 print(ids_str)
             else:
                 print("Error getURL or not found data no page={0}".format(page))
