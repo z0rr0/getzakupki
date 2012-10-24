@@ -2,7 +2,7 @@
 #-*- coding: utf-8 -*-
 
 import re, time, threading
-from urllib import parse
+from urllib import parse, request
 from winners import *
 
 # DEBUG = False # primary
@@ -35,6 +35,7 @@ def main():
         "xml": "http://zakupki.gov.ru/pgz/printForm?type=NOTIFICATION&id=",
         "common": "http://zakupki.gov.ru/pgz/public/action/orders/info/common_info/show?notificationId=",
         "protocol": "http://zakupki.gov.ru/pgz/public/action/orders/info/commission_work_result/show?notificationId=",
+        'searchwin': "http://www.etp-micex.ru/organisation/catalog/supplier/fullTitle/{#filltext#}/organisationTypeId/0/",
     }
     regexps = {
         'get_base_page': re.compile(r"showNotificationPrintForm\(\d+\);return false;",regex_param),
@@ -78,6 +79,7 @@ def main():
                         ones.get_winner(protocol_page, regexps['get_winner'])
                         # get sums
                         ones.get_sums_xml(urls['xml'] + istr)
+                        ones.get_win_data(urls['searchwin'], request.pathname2url)
                         companies.append(ones)
                         print(ones.id, ones.winner['name'])
                 print(ids_str)

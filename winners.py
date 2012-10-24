@@ -74,6 +74,12 @@ def getText(nodelist):
             rc.append(node.data)
     return ''.join(rc)
 
+def parse_kav(nstr):
+    rg = re.compile(r'"(.*?)"', re.UNICODE|re.DOTALL)
+    name = rg.search(nstr)
+    name = name.groups()[0] if name else nstr
+    return name
+
 def parser_main_page(r, rg, from_url):
     """get ids from main page"""
     soup = BeautifulSoup(from_url)
@@ -129,9 +135,9 @@ class Zakupki(ZakupkiBase):
             return True
         return False
 
-    def get_winner(self, form_url, rg):
+    def get_winner(self, from_url, rg):
         """find winnet from table"""
-        soup = BeautifulSoup(form_url)
+        soup = BeautifulSoup(from_url)
         tables = soup.find_all('table', attrs={"class": "iceDatTbl"})
         for table in tables:
             trs = table.find_all('tr', attrs={'class': rg})
@@ -174,6 +180,25 @@ class Zakupki(ZakupkiBase):
                 self.garantsum += prepare_str(getText(garant_amount.childNodes))
         return 0
 
+    def get_win_data(self, url, func):
+        """get winner data"""
+        # newurl = func(url.replace("{#filltext#}", parse_kav(self.winner['name'])))
+        newurl = url.replace("{#filltext#}", func(self.winner['name']))
+        if not self.get_win_data_child(newurl):
+            print('short')
+            self.get_win_data_child(url.replace("{#filltext#}", func(parse_kav(self.winner['name']))))
+        return 0
 
-            
+    def get_win_data_child(self, url):
+        from_url = getURLcontent(url)
+        if from_url:
+            soup = BeautifulSoup(from_url)
+            tables = soup.find_all('table', attrs={"class": "grid grid-standard"})
+            if tables:
+                trs = tables[0].find_all('tr', attrs={'id': re.compile(r"rowId-\d+")})
+                for tr in trs:
+                    needata = tr.find_all('td', recursive=False)
+                    print("ft=", needata[0].text)
+                    return needata[0].text
+        return False
         
