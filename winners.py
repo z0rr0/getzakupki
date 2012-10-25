@@ -119,7 +119,7 @@ def print_result(collections=None):
     file_name = "excel_" + datetime.datetime.now().strftime("%Y%m%d%H%M%S") + ".xls"
     wb = xlwt.Workbook()
     ws = wb.add_sheet('0')
-    headers = ['п/п', 'Название', 'Дата', 'Ссылка', 'Начальная цена контракта', 'Размер обеспечения', 'Несколько заказчиков', 
+    headers = ['п/н', 'Название', 'Дата', 'Ссылка', 'Начальная цена контракта', 'Размер обеспечения', 'Несколько заказчиков', 
         'Победитель', 'Ссылки']
     col, row = 0, 0
     for head in headers:
@@ -127,14 +127,6 @@ def print_result(collections=None):
         col += 1
     n = "HYPERLINK"
     row += 1
-    # f = xlwt.Font()
-    # f.height = 20*72
-    # f.name = 'Verdana'
-    # f.bold = True
-    # f.underline = xlwt.Font.UNDERLINE_DOUBLE
-    # f.colour_index = 4
-    # h_style = xlwt.XFStyle()
-    # h_style.font = f
     for colecttion in collections:
         col = 0
         ws.write(row, col, row)
@@ -157,11 +149,9 @@ def print_result(collections=None):
         for win in colecttion.winner['urls']:
             ws.write(row, col, xlwt.Formula(n + '("{0}";"{1}")'.format(win['url'], win['name'].replace('"', ''))))
             col += 1
-
-        # ws.write(row, col, colecttion.winner['name'])
-        # col += 1
         row += 1
     wb.save(file_name)
+    return 0
 
 class ZakupkiBase():
     """main base class"""
@@ -289,7 +279,6 @@ class Zakupki(ZakupkiBase):
                     wurls['url'] = 'http://www.etp-micex.ru' + get_a if get_a else None
                     if len(wurls['url']) > 255:
                         wurls['url'] = short_url(wurls['url'])
-                        print(wurls['url'])
                     self.winner['urls'].append(wurls)
                     return needata[0].text
         else:
