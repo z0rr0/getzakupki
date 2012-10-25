@@ -72,7 +72,7 @@ def main():
                     continue
                 for i in ids_str:
                     istr = str(i)
-                    ones = Zakupki(i)
+                    ones = Zakupki(i, urls['common'], DEBUG)
                     protocol_page = ones.get_date(urls['protocol'] + istr,regexps['get_date1'], regexps['get_date2'])
                     if ones.necessary_date(config['start'], config['end']):
                         # get winner
@@ -89,6 +89,10 @@ def main():
         print("delta time = ", time.time() - time_start)
         print('found', len(companies))
         print(companies)
+        # if DEBUG:
+        #     for c in companies:
+        #         print("id={0}, date={1}\n\t{2}\n---\n".format(c.id, c.date, c.winner))
+        print_result(companies)
     except (ValueError, IndexError) as e:
         print("Error: {0}".format(e))
 

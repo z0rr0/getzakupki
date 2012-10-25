@@ -3,6 +3,7 @@
 
 import xlrd3 as xlrd
 import xlwt3 as xlwt
+import http.client
 import xml.dom.minidom
 from bs4 import BeautifulSoup
 from urllib import request, parse
@@ -34,6 +35,18 @@ def getURLcontent(url, code='utf-8'):
     else:
         conn.close()
     return from_url
+
+def short_url(url):
+    """get short url"""
+    headers = {"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"}
+    params = parse.urlencode({'url': url})
+    conn = http.client.HTTPConnection("clck.ru")
+    conn.request("POST", "/--", params, headers=headers)
+    res = conn.getresponse()
+    if res.status == 200:
+        link = res.read()
+        return link.decode('utf-8')
+    return None
 
 def get_config_data(filename):
     """read config file"""
@@ -75,10 +88,16 @@ def getText(nodelist):
     return ''.join(rc)
 
 def parse_kav(nstr):
-    rg = re.compile(r'"(.*?)"', re.UNICODE|re.DOTALL)
-    name = rg.search(nstr)
-    name = name.groups()[0] if name else nstr
-    return name
+    rg1 = re.compile(r'"(.*?)"', re.UNICODE|re.DOTALL)
+    rg2 = re.compile(r"'(.*?)'", re.UNICODE|re.DOTALL)
+    name = rg1.search(nstr)
+    if name:
+        return name.groups()[0]
+    else:
+        name = rg2.search(nstr)
+        if name:
+            return name.groups()[0]
+    return nstr
 
 def parser_main_page(r, rg, from_url):
     """get ids from main page"""
@@ -92,15 +111,67 @@ def parser_main_page(r, rg, from_url):
         except (KeyError, ValueError) as e:
             debug_print(e)
             return False
+    else:
+        debug_print("Call 'parser_main_page', dot found data by html-parser")
     return result
+
+def print_result(collections=None):
+    file_name = "excel_" + datetime.datetime.now().strftime("%Y%m%d%H%M%S") + ".xls"
+    wb = xlwt.Workbook()
+    ws = wb.add_sheet('0')
+    headers = ['п/п', 'Название', 'Дата', 'Ссылка', 'Начальная цена контракта', 'Размер обеспечения', 'Несколько заказчиков', 
+        'Победитель', 'Ссылки']
+    col, row = 0, 0
+    for head in headers:
+        ws.write(row, col, head)
+        col += 1
+    n = "HYPERLINK"
+    row += 1
+    # f = xlwt.Font()
+    # f.height = 20*72
+    # f.name = 'Verdana'
+    # f.bold = True
+    # f.underline = xlwt.Font.UNDERLINE_DOUBLE
+    # f.colour_index = 4
+    # h_style = xlwt.XFStyle()
+    # h_style.font = f
+    for colecttion in collections:
+        col = 0
+        ws.write(row, col, row)
+        col += 1
+        ws.write(row, col, colecttion.name) 
+        col += 1
+        ws.write(row, col, colecttion.date.strftime("%d.%m.%Y"))
+        col += 1
+        ws.write(row, col, xlwt.Formula(n + '("{0}";"{1}")'.format(colecttion.url, colecttion.id)))
+        col += 1
+        ws.write(row, col, colecttion.maxsum)
+        col += 1
+        ws.write(row, col, colecttion.garantsum)
+        col += 1
+        mix = 'да' if colecttion.garantMix > 1 else 'нет'
+        ws.write(row, col, mix)
+        col += 1
+        ws.write(row, col, colecttion.winner['name'])
+        col += 1
+        for win in colecttion.winner['urls']:
+            ws.write(row, col, xlwt.Formula(n + '("{0}";"{1}")'.format(win['url'], win['name'].replace('"', ''))))
+            col += 1
+
+        # ws.write(row, col, colecttion.winner['name'])
+        # col += 1
+        row += 1
+    wb.save(file_name)
 
 class ZakupkiBase():
     """main base class"""
-    def __init__(self, arg=None):
+    def __init__(self, arg=None, url=""):
         self.id = arg
+        self.url = url + str(self.id)
         self.date = None
+        self.name = ""
         self.maxsum, self.garantsum, self.garantMix = 0, 0, 0
-        self.winner = {'id': None, 'name': "", 'inn': None}
+        self.winner = {'id': None, 'name': "", 'urls': []}
         self.pages = {'protocol': None, 'info': None, 'xml': None}
 
     def __repr__(self):
@@ -113,9 +184,11 @@ class ZakupkiBase():
 
 class Zakupki(ZakupkiBase):
     """main class"""
-    def __init__(self, arg):
-        super().__init__(arg)
+    def __init__(self, arg, url, debug):
+        global DEBUG
+        super().__init__(arg, url)
         self.arg = arg
+        DEBUG = debug
 
     def get_date(self, url, rg, r):
         """find date in protocol page"""
@@ -131,7 +204,7 @@ class Zakupki(ZakupkiBase):
 
     def necessary_date(self, date1, date2):
         """check date for interval"""
-        if date1.date() <= self.date.date() <= date2.date():
+        if self.date and (date1.date() <= self.date.date() <= date2.date()):
             return True
         return False
 
@@ -148,6 +221,8 @@ class Zakupki(ZakupkiBase):
                     self.winner['id'] = needata[0].text
                     # self.winner['name'] = needata[1].text
                     self.winner['name'] = unescape(needata[1].text, {"&quot;": '"', "&nbsp;": ' ', "&ndash;": '-', "&mdash;": '-', "&laquo;": '"', "&raquo;": '"', "&lsaquo;": '"', "&rsaquo;": '"', '«': '"', '»': '"'})
+                else:
+                    debug_print("Call 'get_winner', dot found winner by html-parser")
         return 0
 
     def get_sums_regexp(self, url, rg_sum, rg_garant):
@@ -162,6 +237,10 @@ class Zakupki(ZakupkiBase):
                 for garant in found:
                     self.garantMix += 1
                     self.garantsum += prepare_str(garant)
+            else:
+                debug_print("Call 'get_sums_regexp', dot found from_url by regexp")
+        else:
+            debug_print("Call 'get_sums_regexp', dot found from_url by getURLcontent")
         return 0
 
     def get_sums_xml(self, url):
@@ -178,15 +257,21 @@ class Zakupki(ZakupkiBase):
             for t in tmp:
                 garant_amount = t.getElementsByTagName("amount")[0]
                 self.garantsum += prepare_str(getText(garant_amount.childNodes))
+            # get name
+            tmp = str_data.getElementsByTagName("subject")[0]
+            self.name = getText(tmp.childNodes)
+        else:
+            debug_print("Call 'get_sums_xml', dot found from_url by getURLcontent")
         return 0
 
     def get_win_data(self, url, func):
         """get winner data"""
-        # newurl = func(url.replace("{#filltext#}", parse_kav(self.winner['name'])))
-        newurl = url.replace("{#filltext#}", func(self.winner['name']))
-        if not self.get_win_data_child(newurl):
-            print('short')
-            self.get_win_data_child(url.replace("{#filltext#}", func(parse_kav(self.winner['name']))))
+        winner_data = self.get_win_data_child(url.replace("{#filltext#}", func(self.winner['name'])))
+        if not winner_data:
+            debug_print('not found by name: 1 ')
+            winner_data = self.get_win_data_child(url.replace("{#filltext#}", func(parse_kav(self.winner['name']))))
+            if not winner_data:
+                debug_print('not found by name: 2 ({}) '.format(self.winner['name']))
         return 0
 
     def get_win_data_child(self, url):
@@ -198,7 +283,16 @@ class Zakupki(ZakupkiBase):
                 trs = tables[0].find_all('tr', attrs={'id': re.compile(r"rowId-\d+")})
                 for tr in trs:
                     needata = tr.find_all('td', recursive=False)
-                    print("ft=", needata[0].text)
+                    wurls = {} 
+                    wurls['name'] = needata[0].text
+                    get_a = needata[0].a.get('href')
+                    wurls['url'] = 'http://www.etp-micex.ru' + get_a if get_a else None
+                    if len(wurls['url']) > 255:
+                        wurls['url'] = short_url(wurls['url'])
+                        print(wurls['url'])
+                    self.winner['urls'].append(wurls)
                     return needata[0].text
+        else:
+             debug_print("Call 'get_win_data_child', dot found from_url by getURLcontent")
         return False
         
