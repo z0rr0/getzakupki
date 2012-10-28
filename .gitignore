@@ -31,3 +31,5 @@ pip-log.txt
 wf
 env/*
 wf*
+# ignore MS Excel
+*.xls
