@@ -61,6 +61,7 @@ def main():
     try:
         pageCount, recordCount, page = 0, 0, config['first']
         time_start = time.time()
+        print('Start program')
         while (page <= config['last']):
             params['index'] = page
             prepate_url = prepare_func(params)
@@ -81,12 +82,12 @@ def main():
                         # get sums
                         ones.get_sums_xml(urls['xml'] + istr)
                         ones.get_win_data(urls['searchwin'], request.pathname2url)
+                        # add new record
                         companies.append(ones)
             else:
                 print("Error getURL or not found data no page={0}".format(page))
             page += 1
-        print("delta time = ", time.time() - time_start)
-        print('found', len(companies))
+        print("Finish program, found {0} record for {1} second(s)".format(len(companies), round(time.time() - time_start,2)))
         print_result(companies)
     except (ValueError, IndexError) as e:
         print("Error: {0}".format(e))
