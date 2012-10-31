@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #-*- coding: utf-8 -*-
 
-import xlrd3 as xlrd
+# import xlrd3 as xlrd
 import xlwt3 as xlwt
 import http.client
 import xml.dom.minidom
@@ -116,7 +116,7 @@ def parser_main_page(r, rg, from_url):
     return result
 
 def print_result(collections=None):
-    file_name = "excel_" + datetime.datetime.now().strftime("%Y%m%d%H%M%S") + ".xls"
+    file_name = "excel_" + datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S") + ".xls"
     wb = xlwt.Workbook()
     ws = wb.add_sheet('0')
     headers = ['п/н', 'Название', 'Дата', 'Ссылка', 'Начальная цена контракта', 'Размер обеспечения', 'Несколько заказчиков', 
@@ -250,6 +250,29 @@ class Zakupki(ZakupkiBase):
             # get name
             tmp = str_data.getElementsByTagName("subject")[0]
             self.name = getText(tmp.childNodes)
+        else:
+            debug_print("Call 'get_sums_xml', dot found from_url by getURLcontent")
+        return 0
+
+    def get_sums_common(self, url):
+        """get sums with html parser"""
+        from_url = getURLcontent(url)
+        if from_url:
+            soup = BeautifulSoup(from_url)
+            table = soup.find('table', attrs={"class": "orderInfo", "cellspacing": "0", "cellpadding": "0"})
+            trs = table.find_all('tr')
+            for tr in trs:
+                label = tr.find('label', attrs={"class": "iceOutLbl"})
+                if label:
+                    if label.text.find("Размер обеспечения исполнения контракта") > 0:
+                        span = tr.find('span', attrs={"class": "iceOutTxt"})
+                        if span:
+                            self.garantsum += prepare_str(span.text)
+                            self.garantMix += 1
+                    elif label.text.find("Начальная (Максимальная) цена контракта") > 0:
+                        span = tr.find('span', attrs={"class": "iceOutTxt"})
+                        if span:
+                            self.maxsum += prepare_str(span.text)
         else:
             debug_print("Call 'get_sums_xml', dot found from_url by getURLcontent")
         return 0
