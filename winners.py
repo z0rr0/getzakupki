@@ -135,7 +135,7 @@ def print_result(collections=None):
 
     font1.bold = False
     style1.font = font1
-    style1.num_format_str = '0.00'
+    style1.num_format_str = '# ### ##0.00'
 
     font2.colour_index = 4
     style2.font = font2
@@ -173,7 +173,7 @@ def print_result(collections=None):
             urls = colecttion.winner['surl']
         elif len(colecttion.winner['urls']) == 1:
             links = 'один'
-            urls = colecttion.winner['urls'][0]
+            urls = colecttion.winner['urls'][0]['url']
         else:
             links = 'поиск'
             urls = colecttion.winner['surl']
