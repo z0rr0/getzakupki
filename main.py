@@ -95,6 +95,7 @@ def main():
         # sorting
         companies.sort(key=lambda item: item.winner['name'], reverse=True)
         companies.sort(key=lambda item: item.garantsum, reverse=True)
+        companies.sort(key=lambda item: len(item.winner['urls'])==1, reverse=True)
         # print result in MS Excel file
         print_result(companies)
         if osdetect() == 'Windows':

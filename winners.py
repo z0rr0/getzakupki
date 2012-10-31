@@ -38,15 +38,16 @@ def getURLcontent(url, code='utf-8'):
 
 def short_url(url):
     """get short url"""
-    headers = {"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"}
-    params = parse.urlencode({'url': url})
-    conn = http.client.HTTPConnection("clck.ru")
-    conn.request("POST", "/--", params, headers=headers)
-    res = conn.getresponse()
-    if res.status == 200:
-        link = res.read()
-        return link.decode('utf-8')
-    return None
+    if len(url) > 255:
+        headers = {"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"}
+        params = parse.urlencode({'url': url})
+        conn = http.client.HTTPConnection("clck.ru")
+        conn.request("POST", "/--", params, headers=headers)
+        res = conn.getresponse()
+        if res.status == 200:
+            link = res.read()
+            return link.decode('utf-8')
+    return url
 
 def get_config_data(filename):
     """read config file"""
@@ -119,11 +120,32 @@ def print_result(collections=None):
     file_name = "excel_" + datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S") + ".xls"
     wb = xlwt.Workbook()
     ws = wb.add_sheet('0')
-    headers = ['п/н', 'Название', 'Дата', 'Ссылка', 'Начальная цена контракта', 'Размер обеспечения', 'Несколько заказчиков', 
-        'Победитель', 'Ссылки']
+    headers = ['п/н', 'Название', 'Дата', 'Ссылка', 'Начальная цена контракта', 
+        'Размер обеспечения', 'Несколько заказчиков', 'Победитель', 'Кол-во, ссылка', 
+        'Регион', 'Город']
+    ezxf = xlwt.easyxf
+    font0, font1, font2, font3 = xlwt.Font(), xlwt.Font(), xlwt.Font(), xlwt.Font()
+    style0, style1, style2, style3 = xlwt.XFStyle(), xlwt.XFStyle(), xlwt.XFStyle(), xlwt.XFStyle()
+
+    style4 = ezxf("align: wrap on, vert centre, horiz left")
+
+    font0.name = 'Times New Roman'
+    font0.bold = True
+    style0.font = font0
+
+    font1.bold = False
+    style1.font = font1
+    style1.num_format_str = '0.00'
+
+    font2.colour_index = 4
+    style2.font = font2
+
+    style3.num_format_str = "DD.MM.YYYY"
+    style3.font = font3
+
     col, row = 0, 0
     for head in headers:
-        ws.write(row, col, head)
+        ws.write(row, col, head, style0)
         col += 1
     n = "HYPERLINK"
     row += 1
@@ -131,24 +153,31 @@ def print_result(collections=None):
         col = 0
         ws.write(row, col, row)
         col += 1
-        ws.write(row, col, colecttion.name) 
+        ws.write(row, col, colecttion.name, style4) 
         col += 1
-        ws.write(row, col, colecttion.date.strftime("%d.%m.%Y"))
+        ws.write(row, col, colecttion.date, style3)
         col += 1
-        ws.write(row, col, xlwt.Formula(n + '("{0}";"{1}")'.format(colecttion.url, colecttion.id)))
+        ws.write(row, col, xlwt.Formula(n + '("{0}";"{1}")'.format(colecttion.url, colecttion.id)), style2)
         col += 1
-        ws.write(row, col, colecttion.maxsum)
+        ws.write(row, col, colecttion.maxsum, style1)
         col += 1
-        ws.write(row, col, colecttion.garantsum)
+        ws.write(row, col, colecttion.garantsum, style1)
         col += 1
         mix = 'да' if colecttion.garantMix > 1 else 'нет'
         ws.write(row, col, mix)
         col += 1
-        ws.write(row, col, colecttion.winner['name'])
+        ws.write(row, col, colecttion.winner['name'], style4)
         col += 1
-        for win in colecttion.winner['urls']:
-            ws.write(row, col, xlwt.Formula(n + '("{0}";"{1}")'.format(win['url'], win['name'].replace('"', ''))))
-            col += 1
+        if len(colecttion.winner['urls'])>1:
+            links = 'несколько'
+            urls = colecttion.winner['surl']
+        elif len(colecttion.winner['urls']) == 1:
+            links = 'один'
+            urls = colecttion.winner['urls'][0]
+        else:
+            links = 'поиск'
+            urls = colecttion.winner['surl']
+        ws.write(row, col, xlwt.Formula(n + '("{0}";"{1}")'.format(urls, links)), style2)
         row += 1
     wb.save(file_name)
     return 0
@@ -161,7 +190,7 @@ class ZakupkiBase():
         self.date = None
         self.name = ""
         self.maxsum, self.garantsum, self.garantMix = 0, 0, 0
-        self.winner = {'id': None, 'name': "", 'urls': []}
+        self.winner = {'id': None, 'name': "", 'urls': [], 'surl': None}
         self.pages = {'protocol': None, 'info': None, 'xml': None}
 
     def __repr__(self):
@@ -273,6 +302,9 @@ class Zakupki(ZakupkiBase):
                         span = tr.find('span', attrs={"class": "iceOutTxt"})
                         if span:
                             self.maxsum += prepare_str(span.text)
+                    elif label.text.find("Краткое наименование аукциона") > 0:
+                        span = tr.find('span', attrs={"class": "iceOutTxt"})
+                        self.name = span.text.strip()
         else:
             debug_print("Call 'get_sums_xml', dot found from_url by getURLcontent")
         return 0
@@ -288,6 +320,7 @@ class Zakupki(ZakupkiBase):
         return 0
 
     def get_win_data_child(self, url):
+        self.winner['surl'] = short_url(url)
         from_url = getURLcontent(url)
         if from_url:
             soup = BeautifulSoup(from_url)
@@ -300,8 +333,7 @@ class Zakupki(ZakupkiBase):
                     wurls['name'] = needata[0].text
                     get_a = needata[0].a.get('href')
                     wurls['url'] = 'http://www.etp-micex.ru' + get_a if get_a else None
-                    if len(wurls['url']) > 255:
-                        wurls['url'] = short_url(wurls['url'])
+                    wurls['url'] = short_url(wurls['url'])
                     self.winner['urls'].append(wurls)
                     return needata[0].text
         else:
