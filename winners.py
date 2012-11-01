@@ -122,7 +122,7 @@ def print_result(collections=None):
     ws = wb.add_sheet('0')
     headers = ['п/н', 'Название', 'Дата', 'Ссылка', 'Начальная цена контракта', 
         'Размер обеспечения', 'Несколько заказчиков', 'Победитель', 'Кол-во, ссылка', 
-        'Регион', 'Город']
+        'Регион', 'Город', 'Телефон', 'ИНН', 'КПП', 'ОГРН']
     ezxf = xlwt.easyxf
     font0, font1, font2, font3 = xlwt.Font(), xlwt.Font(), xlwt.Font(), xlwt.Font()
     style0, style1, style2, style3 = xlwt.XFStyle(), xlwt.XFStyle(), xlwt.XFStyle(), xlwt.XFStyle()
@@ -168,16 +168,21 @@ def print_result(collections=None):
         col += 1
         ws.write(row, col, colecttion.winner['name'], style4)
         col += 1
-        if len(colecttion.winner['urls'])>1:
-            links = 'несколько'
-            urls = colecttion.winner['surl']
-        elif len(colecttion.winner['urls']) == 1:
-            links = 'один'
-            urls = colecttion.winner['urls'][0]['url']
-        else:
-            links = 'поиск'
-            urls = colecttion.winner['surl']
+        links = 'один' if colecttion.winner['urls'] == 1 else links = 'поиск'
+        urls = colecttion.winner['surls']
         ws.write(row, col, xlwt.Formula(n + '("{0}";"{1}")'.format(urls, links)), style2)
+        col += 1
+        ws.write(row, col, colecttion.winner['region'])
+        col += 1
+        ws.write(row, col, colecttion.winner['city'])
+        col += 1
+        ws.write(row, col, colecttion.winner['phone'])
+        col += 1
+        ws.write(row, col, colecttion.winner['inn'])
+        col += 1
+        ws.write(row, col, colecttion.winner['kpp'])
+        col += 1
+        ws.write(row, col, colecttion.winner['ogrn'])
         row += 1
     wb.save(file_name)
     return 0
@@ -190,7 +195,8 @@ class ZakupkiBase():
         self.date = None
         self.name = ""
         self.maxsum, self.garantsum, self.garantMix = 0, 0, 0
-        self.winner = {'id': None, 'name': "", 'urls': [], 'surl': None}
+        self.winner = {'id': None, 'name': "", 'urls': 0, 'surls': None, 
+            'inn': None, 'ogrn': None, 'kpp': None, 'phone': None, 'region': None, 'city': None}
         self.pages = {'protocol': None, 'info': None, 'xml': None}
 
     def __repr__(self):
@@ -320,23 +326,48 @@ class Zakupki(ZakupkiBase):
         return 0
 
     def get_win_data_child(self, url):
-        self.winner['surl'] = short_url(url)
         from_url = getURLcontent(url)
+        self.winner['surls'] = short_url(url)
         if from_url:
             soup = BeautifulSoup(from_url)
-            tables = soup.find_all('table', attrs={"class": "grid grid-standard"})
-            if tables:
-                trs = tables[0].find_all('tr', attrs={'id': re.compile(r"rowId-\d+")})
-                for tr in trs:
-                    needata = tr.find_all('td', recursive=False)
-                    wurls = {} 
-                    wurls['name'] = needata[0].text
-                    get_a = needata[0].a.get('href')
-                    wurls['url'] = 'http://www.etp-micex.ru' + get_a if get_a else None
-                    wurls['url'] = short_url(wurls['url'])
-                    self.winner['urls'].append(wurls)
-                    return needata[0].text
+            table = soup.find('table', attrs={"class": "grid grid-standard"})
+            if table:
+                trs = table.find_all('tr', attrs={'id': re.compile(r"rowId-\d+")})
+                self.winner['urls'] = len(trs)
+                try:
+                    if self.winner['urls'] == 1:
+                        needata = trs[0].find('a')
+                        surls = 'http://www.etp-micex.ru' + needata.get('href')
+                        self.winner['surls'] = short_url(surls)
+                        self.get_add_wininfo(self.winner['surls'])
+                        print('INN-',self.winner['inn'])
+                        return self.winner['surls']
+                except IndexError as er:
+                    debug_print("call get_win_data_child: error in html parser")
+                    return 0
         else:
              debug_print("Call 'get_win_data_child', dot found from_url by getURLcontent")
         return False
+
+    def get_add_wininfo(self, url):
+        from_url = getURLcontent(url)
+        if from_url:
+            soup = BeautifulSoup(from_url)
+            fieldset = soup.find("fieldset", attrs={'id': "fieldset-mainData"})
+
+            inn = fieldset.find("span", attrs={"id": "mainData-inn", "class": "formInfo"})
+            ogrn = fieldset.find("span", attrs={"id": "mainData-ogrn", "class": "formInfo"})
+            kpp = fieldset.find("span", attrs={"id": "mainData-kpp", "class": "formInfo"})
+            phone = fieldset.find("span", attrs={"id": "mainData-telephone", "class": "formInfo"})
+            if inn: self.winner['inn'] = inn.text
+            if ogrn: self.winner['ogrn'] = ogrn.text
+            if kpp: self.winner['kpp'] = kpp.text
+            if phone: self.winner['phone'] = phone.text
+
+            fieldset = soup.find("fieldset", attrs={'id': "fieldset-placement"})
+            region = fieldset.find("span", attrs={"id": "placement-subjectRf", "class": "formInfo"})
+            city = fieldset.find("span", attrs={"id": "placement-cityOrArea", "class": "formInfo"})
+            if region: self.winner['region'] = region.text
+            if city: self.winner['city'] = city.text
+        return 0
         
