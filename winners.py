@@ -168,7 +168,10 @@ def print_result(collections=None):
         col += 1
         ws.write(row, col, colecttion.winner['name'], style4)
         col += 1
-        links = 'один' if colecttion.winner['urls'] == 1 else links = 'поиск'
+        if (colecttion.winner['urls'] == 1):
+            links = 'один'
+        else:
+            links = 'поиск'
         urls = colecttion.winner['surls']
         ws.write(row, col, xlwt.Formula(n + '("{0}";"{1}")'.format(urls, links)), style2)
         col += 1
