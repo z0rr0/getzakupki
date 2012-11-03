@@ -194,9 +194,12 @@ def print_from_db(collections):
     file_name = "excel_" + datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S") + ".xls"
     wb = xlwt.Workbook()
     ws = wb.add_sheet('0')
+    # headers = ['п/н', 'Название', 'Дата', 'Ссылка', 'Начальная цена контракта', 
+    #     'Размер обеспечения', 'Несколько заказчиков', 'Победитель', 'Кол-во, ссылка', 
+    #     'Регион', 'Город', 'Телефон', 'ИНН', 'КПП', 'ОГРН']
     headers = ['п/н', 'Название', 'Дата', 'Ссылка', 'Начальная цена контракта', 
-        'Размер обеспечения', 'Несколько заказчиков', 'Победитель', 'Кол-во, ссылка', 
-        'Регион', 'Город', 'Телефон', 'ИНН', 'КПП', 'ОГРН']
+        'Размер обеспечения', 'Несколько заказчиков', 'Победитель', 'Ссылка', 
+        'Регион', 'Телефон']
     ezxf = xlwt.easyxf
     font0, font1, font2, font3 = xlwt.Font(), xlwt.Font(), xlwt.Font(), xlwt.Font()
     style0, style1, style2, style3 = xlwt.XFStyle(), xlwt.XFStyle(), xlwt.XFStyle(), xlwt.XFStyle()
@@ -245,15 +248,15 @@ def print_from_db(collections):
         col += 1
         ws.write(row, col, dt['region'])
         col += 1
-        ws.write(row, col, dt['city'])
-        col += 1
+        # ws.write(row, col, dt['city'])
+        # col += 1
         ws.write(row, col, dt['phone'])
         col += 1
-        ws.write(row, col, dt['inn'])
-        col += 1
-        ws.write(row, col, dt['kpp'])
-        col += 1
-        ws.write(row, col, dt['ogrn'])
+        # ws.write(row, col, dt['inn'])
+        # col += 1
+        # ws.write(row, col, dt['kpp'])
+        # col += 1
+        # ws.write(row, col, dt['ogrn'])
         row += 1
     wb.save(file_name)
     return 0
@@ -370,7 +373,7 @@ def print_by_hostory(cur, ids=None):
                 tmp['surls'] = d[2]
                 tmp['sname'] = "поиск"
                 tmp['region'] = tmp['city'] = tmp['phone'] = tmp['inn'] = tmp['kpp'] = tmp['ogrn'] = ""
-            tmp['winner'] = d[18]
+            tmp['winner'] = d[19]
             dicts.append(tmp)
     return dicts
 
