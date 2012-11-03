@@ -242,7 +242,7 @@ def print_from_db(collections):
         col += 1
         ws.write(row, col, dt['garantmix'])
         col += 1
-        ws.write(row, col, dt['winner'])
+        ws.write(row, col, dt['winner'], style4)
         col += 1
         ws.write(row, col, xlwt.Formula(n + '("{0}";"{1}")'.format(dt['surls'], dt['sname'])), style2)
         col += 1
