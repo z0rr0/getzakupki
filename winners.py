@@ -314,6 +314,7 @@ def check_history(connect, num):
     return result
 
 def saveInHistory(connect, results):
+    """save history data in database"""
     cur = connect.cursor()
     prints = []
     ids = []
@@ -342,6 +343,7 @@ def saveInHistory(connect, results):
     return prints
 
 def print_by_hostory(cur, ids=None):
+    """read db, get data by ids"""
     dicts = []
     if ids:
         cur.execute("SELECT `auction`.`id`, `auction`.`winner_id`, `auction`.`wurl`, `auction`.`name`, `auction`.`url`, `auction`.`date`, `auction`.`maxsum`, `auction`.`garantsum`, `auction`.`garantmix`, `auction`.`created`, `winner`.`name`, `winner`.`urls`, `winner`.`surls`, `winner`.`region`, `winner`.`city`, `winner`.`inn`, `winner`.`kpp`, `winner`.`ogrn`, `winner`.`phone`, `auction`.`winner_name`, (`auction`.`winner_id` IS NULL) as `wnn` FROM `auction` LEFT JOIN `winner` ON (`auction`.`winner_id`=`winner`.`id`) WHERE `auction`.`id` IN (" + ",".join(ids) + ") ORDER BY `wnn`, `auction`.`garantsum` DESC, `auction`.`garantmix`, `auction`.`name`")
