@@ -8,7 +8,7 @@ import xml.dom.minidom
 from bs4 import BeautifulSoup
 from urllib import request, parse
 from xml.sax.saxutils import unescape
-import configparser, re, threading, datetime
+import configparser, re, threading, datetime, sqlite3, os
 
 DEBUG = False # secondary (primary in main.py)
 
@@ -38,7 +38,7 @@ def getURLcontent(url, code='utf-8'):
 
 def short_url(url):
     """get short url"""
-    if len(url) > 255:
+    if len(url) > 254:
         headers = {"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"}
         params = parse.urlencode({'url': url})
         conn = http.client.HTTPConnection("clck.ru")
@@ -116,7 +116,7 @@ def parser_main_page(r, rg, from_url):
         debug_print("Call 'parser_main_page', dot found data by html-parser")
     return result
 
-def print_result(collections=None):
+def print_result_col(collections=None):
     file_name = "excel_" + datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S") + ".xls"
     wb = xlwt.Workbook()
     ws = wb.add_sheet('0')
@@ -190,6 +190,189 @@ def print_result(collections=None):
     wb.save(file_name)
     return 0
 
+def print_from_db(collections):
+    file_name = "excel_" + datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S") + ".xls"
+    wb = xlwt.Workbook()
+    ws = wb.add_sheet('0')
+    headers = ['п/н', 'Название', 'Дата', 'Ссылка', 'Начальная цена контракта', 
+        'Размер обеспечения', 'Несколько заказчиков', 'Победитель', 'Кол-во, ссылка', 
+        'Регион', 'Город', 'Телефон', 'ИНН', 'КПП', 'ОГРН']
+    ezxf = xlwt.easyxf
+    font0, font1, font2, font3 = xlwt.Font(), xlwt.Font(), xlwt.Font(), xlwt.Font()
+    style0, style1, style2, style3 = xlwt.XFStyle(), xlwt.XFStyle(), xlwt.XFStyle(), xlwt.XFStyle()
+
+    style4 = ezxf("align: wrap on, vert centre, horiz left")
+
+    font0.name = 'Times New Roman'
+    font0.bold = True
+    style0.font = font0
+
+    font1.bold = False
+    style1.font = font1
+    style1.num_format_str = '# ### ##0.00'
+
+    font2.colour_index = 4
+    style2.font = font2
+
+    style3.num_format_str = "DD.MM.YYYY"
+    style3.font = font3
+
+    col, row = 0, 0
+    for head in headers:
+        ws.write(row, col, head, style0)
+        col += 1
+    n = "HYPERLINK"
+    row += 1
+    for dt in collections:
+        col = 0
+        ws.write(row, col, row)
+        col += 1
+        ws.write(row, col, dt['name'], style4) 
+        col += 1
+        ws.write(row, col, dt['date'], style3)
+        col += 1
+        ws.write(row, col, xlwt.Formula(n + '("{0}";"{1}")'.format(dt['url'], dt['id'])), style2)
+        col += 1
+        ws.write(row, col, dt['maxsum'], style1)
+        col += 1
+        ws.write(row, col, dt['garantsum'], style1)
+        col += 1
+        ws.write(row, col, dt['garantmix'])
+        col += 1
+        ws.write(row, col, dt['winner'])
+        col += 1
+        ws.write(row, col, xlwt.Formula(n + '("{0}";"{1}")'.format(dt['surls'], dt['sname'])), style2)
+        col += 1
+        ws.write(row, col, dt['region'])
+        col += 1
+        ws.write(row, col, dt['city'])
+        col += 1
+        ws.write(row, col, dt['phone'])
+        col += 1
+        ws.write(row, col, dt['inn'])
+        col += 1
+        ws.write(row, col, dt['kpp'])
+        col += 1
+        ws.write(row, col, dt['ogrn'])
+        row += 1
+    wb.save(file_name)
+    return 0
+
+def get_connection(dbfile):
+    # create if not exsist
+    if not os.path.exists(dbfile): 
+        open(dbfile, 'w').close() 
+        connect = sqlite3.connect(dbfile)
+        cur = connect.cursor()
+        with connect:
+            try:
+                cur.executescript("""
+                    CREATE TABLE IF NOT EXISTS "auction" (
+                        "id" INTEGER PRIMARY KEY  NOT NULL,
+                        "winner_id" INTEGER,
+                        "winner_name" VARCHAR,
+                        "wurl" VARCHAR(255),
+                        "name" TEXT NOT NULL,
+                        "url" TEXT NOT NULL,
+                        "date" DATE NOT NULL,
+                        "maxsum" DOUBLE NOT NULL DEFAULT 0,
+                        "garantsum" DOUBLE NOT NULL DEFAULT 0,
+                        "garantmix" INTEGER NOT NULL DEFAULT 0,
+                        "created" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE TABLE IF NOT EXISTS "winner" (
+                        "id" INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL,
+                        "num" INTEGER NOT NULL,
+                        "name" VARCHAR,
+                        "urls" INTEGER NOT NULL DEFAULT 0,
+                        "surls" VARCHAR(255),
+                        "region" VARCHAR,
+                        "city" VARCHAR,
+                        "inn" VARCHAR,
+                        "kpp" VARCHAR,
+                        "ogrn" VARCHAR,
+                        "phone" VARCHAR
+                    );
+                    CREATE INDEX IF NOT EXISTS "winner_name" ON "winner" ("name" ASC);
+                    CREATE INDEX IF NOT EXISTS "auction_date" ON "auction" ("date" ASC);
+                    CREATE INDEX IF NOT EXISTS "auction_winner" ON "auction" ("winner_id" ASC, "garantsum" DESC, "garantmix" ASC, "name" ASC);
+                    """)
+            except sqlite3.DatabaseError as er:
+                print(er)
+            cur.close()
+    else:
+        connect = sqlite3.connect(dbfile)
+    return connect
+
+def check_history(connect, num):
+    cur = connect.cursor()
+    result = False
+    cur.execute("SELECT `id` FROM `auction` WHERE `id`=(?)", (num,))
+    if cur.fetchone():
+        result = True
+    cur.close()
+    return result
+
+def saveInHistory(connect, results):
+    cur = connect.cursor()
+    prints = []
+    ids = []
+    with connect:
+        # save winner
+        try:
+            for res in results:
+                # default values
+                sql_str = "(`id`,`name`,`url`,`date`,`maxsum`,`garantsum`,`garantMix`,`wurl`,`winner_name`) VALUES (?,?,?,?,?,?,?,?,?)"
+                sql_val = (res.id, res.name, res.url, res.date, res.maxsum, res.garantsum, res.garantMix, res.winner['surls'], res.winner['name'])
+                if res.winner['urls'] == 1:
+                    cur.execute("INSERT INTO `winner` (`num`,`name`,`urls`,`surls`,`region`,`city`,`inn`,`kpp`,`ogrn`,`phone`) VALUES (?,?,?,?,?,?,?,?,?,?)", (res.winner["id"],res.winner["name"],res.winner["urls"],res.winner["surls"],res.winner["region"],res.winner["city"],res.winner["inn"],res.winner["kpp"],res.winner["ogrn"],res.winner["phone"]))
+                    winner_id = cur.lastrowid
+                    # change default values
+                    sql_str = "(`id`,`winner_id`,`name`,`url`,`date`,`maxsum`,`garantsum`,`garantMix`,`winner_name`) VALUES (?,?,?,?,?,?,?,?,?)"
+                    sql_val = (res.id, winner_id, res.name, res.url, res.date, res.maxsum, res.garantsum, res.garantMix, res.winner['name'])
+                # save auction
+                cur.execute("INSERT INTO `auction` " + sql_str, sql_val)
+                ids.append(str(cur.lastrowid))
+        except sqlite3.DatabaseError as er:
+            print("SQLite3 error:", er)
+        else:
+            # read data with sorting
+            prints = print_by_hostory(cur, ids)
+    cur.close()
+    return prints
+
+def print_by_hostory(cur, ids=None):
+    dicts = []
+    if ids:
+        cur.execute("SELECT `auction`.`id`, `auction`.`winner_id`, `auction`.`wurl`, `auction`.`name`, `auction`.`url`, `auction`.`date`, `auction`.`maxsum`, `auction`.`garantsum`, `auction`.`garantmix`, `auction`.`created`, `winner`.`name`, `winner`.`urls`, `winner`.`surls`, `winner`.`region`, `winner`.`city`, `winner`.`inn`, `winner`.`kpp`, `winner`.`ogrn`, `winner`.`phone`, `auction`.`winner_name`, (`auction`.`winner_id` IS NULL) as `wnn` FROM `auction` LEFT JOIN `winner` ON (`auction`.`winner_id`=`winner`.`id`) WHERE `auction`.`id` IN (" + ",".join(ids) + ") ORDER BY `wnn`, `auction`.`garantsum` DESC, `auction`.`garantmix`, `auction`.`name`")
+        for d in cur.fetchall():
+            tmp = {}
+            tmp['name'] = d[3]
+            tmp['date'] = datetime.datetime.strptime(d[5], '%Y-%m-%d %H:%M:%S')
+            tmp['id'] = d[0]
+            tmp['url'] = d[4]
+            tmp['maxsum'] = d[6]
+            tmp['garantsum'] = d[7]
+            tmp['garantmix'] = 'да' if int(d[8]) > 1 else 'нет'
+            if d[1]:
+                tmp['surls'] = d[12]
+                tmp['sname'] = "подробнее"
+                # addition
+                tmp['region'] = d[13]
+                tmp['city'] = d[14]
+                tmp['phone'] = d[18]
+                tmp['inn'] = d[15]
+                tmp['kpp'] = d[16]
+                tmp['ogrn'] = d[17]
+            else:
+                tmp['surls'] = d[2]
+                tmp['sname'] = "поиск"
+                tmp['region'] = tmp['city'] = tmp['phone'] = tmp['inn'] = tmp['kpp'] = tmp['ogrn'] = ""
+            tmp['winner'] = d[18]
+            dicts.append(tmp)
+    return dicts
+
+
 class ZakupkiBase():
     """main base class"""
     def __init__(self, arg=None, url=""):
@@ -200,7 +383,7 @@ class ZakupkiBase():
         self.maxsum, self.garantsum, self.garantMix = 0, 0, 0
         self.winner = {'id': None, 'name': "", 'urls': 0, 'surls': None, 
             'inn': None, 'ogrn': None, 'kpp': None, 'phone': None, 'region': None, 'city': None}
-        self.pages = {'protocol': None, 'info': None, 'xml': None}
+        # self.pages = {'protocol': None, 'info': None, 'xml': None}
 
     def __repr__(self):
         return "<Zakupki object, id={0}>".format(self.id)
@@ -247,12 +430,12 @@ class Zakupki(ZakupkiBase):
                 # winner nubmer == 1
                 if needata[5].text == '1':
                     self.winner['id'] = needata[0].text
-                    # self.winner['name'] = needata[1].text
                     self.winner['name'] = unescape(needata[1].text, {"&quot;": '"', "&nbsp;": ' ', "&ndash;": '-', "&mdash;": '-', "&laquo;": '"', "&raquo;": '"', "&lsaquo;": '"', "&rsaquo;": '"', '«': '"', '»': '"'})
                 else:
                     debug_print("Call 'get_winner', dot found winner by html-parser")
-        return 0
+        return self.winner['id']
 
+    # dont use
     def get_sums_regexp(self, url, rg_sum, rg_garant):
         """get sums with regexps"""
         from_url = getURLcontent(url, 'cp1251')
@@ -271,6 +454,7 @@ class Zakupki(ZakupkiBase):
             debug_print("Call 'get_sums_regexp', dot found from_url by getURLcontent")
         return 0
 
+    # dont use
     def get_sums_xml(self, url):
         """get sums with xml parser"""
         from_url = getURLcontent(url, 'cp1251')
@@ -310,7 +494,7 @@ class Zakupki(ZakupkiBase):
                     elif label.text.find("Начальная (Максимальная) цена контракта") > 0:
                         span = tr.find('span', attrs={"class": "iceOutTxt"})
                         if span:
-                            self.maxsum += prepare_str(span.text)
+                            self.maxsum = prepare_str(span.text)
                     elif label.text.find("Краткое наименование аукциона") > 0:
                         span = tr.find('span', attrs={"class": "iceOutTxt"})
                         self.name = span.text.strip()
@@ -329,6 +513,7 @@ class Zakupki(ZakupkiBase):
         return 0
 
     def get_win_data_child(self, url):
+        """search winner in other site"""
         from_url = getURLcontent(url)
         self.winner['surls'] = short_url(url)
         if from_url:
@@ -342,8 +527,7 @@ class Zakupki(ZakupkiBase):
                         needata = trs[0].find('a')
                         surls = 'http://www.etp-micex.ru' + needata.get('href')
                         self.winner['surls'] = short_url(surls)
-                        self.get_add_wininfo(self.winner['surls'])
-                        print('INN-',self.winner['inn'])
+                        self.get_add_wininfo(surls)
                         return self.winner['surls']
                 except IndexError as er:
                     debug_print("call get_win_data_child: error in html parser")
@@ -353,24 +537,25 @@ class Zakupki(ZakupkiBase):
         return False
 
     def get_add_wininfo(self, url):
+        """get winner datales"""
         from_url = getURLcontent(url)
         if from_url:
             soup = BeautifulSoup(from_url)
             fieldset = soup.find("fieldset", attrs={'id': "fieldset-mainData"})
-
-            inn = fieldset.find("span", attrs={"id": "mainData-inn", "class": "formInfo"})
-            ogrn = fieldset.find("span", attrs={"id": "mainData-ogrn", "class": "formInfo"})
-            kpp = fieldset.find("span", attrs={"id": "mainData-kpp", "class": "formInfo"})
-            phone = fieldset.find("span", attrs={"id": "mainData-telephone", "class": "formInfo"})
-            if inn: self.winner['inn'] = inn.text
-            if ogrn: self.winner['ogrn'] = ogrn.text
-            if kpp: self.winner['kpp'] = kpp.text
-            if phone: self.winner['phone'] = phone.text
-
+            if fieldset:
+                inn = fieldset.find("span", attrs={"id": "mainData-inn", "class": "formInfo"})
+                ogrn = fieldset.find("span", attrs={"id": "mainData-ogrn", "class": "formInfo"})
+                kpp = fieldset.find("span", attrs={"id": "mainData-kpp", "class": "formInfo"})
+                phone = fieldset.find("span", attrs={"id": "mainData-telephone", "class": "formInfo"})
+                if inn: self.winner['inn'] = inn.text
+                if ogrn: self.winner['ogrn'] = ogrn.text
+                if kpp: self.winner['kpp'] = kpp.text
+                if phone: self.winner['phone'] = phone.text
             fieldset = soup.find("fieldset", attrs={'id': "fieldset-placement"})
-            region = fieldset.find("span", attrs={"id": "placement-subjectRf", "class": "formInfo"})
-            city = fieldset.find("span", attrs={"id": "placement-cityOrArea", "class": "formInfo"})
-            if region: self.winner['region'] = region.text
-            if city: self.winner['city'] = city.text
+            if fieldset:
+                region = fieldset.find("span", attrs={"id": "placement-subjectRf", "class": "formInfo"})
+                city = fieldset.find("span", attrs={"id": "placement-cityOrArea", "class": "formInfo"})
+                if region: self.winner['region'] = region.text
+                if city: self.winner['city'] = city.text
         return 0
         

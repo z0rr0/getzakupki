@@ -9,7 +9,10 @@ from platform import system as osdetect
 
 # DEBUG = False # primary
 CONFIG = "config.conf"
-MAX_THREADS = 6
+HISTORY_FILE = "history.sqlite"
+
+# don't use
+# MAX_THREADS = 6
 
 # orderName - название заказа
 # _orderNameMorphology - с учетом всех форм слов
@@ -26,7 +29,7 @@ MAX_THREADS = 6
 # _smallBisnes - для субъектов малого предпринимательства
 
 def main():
-    global DEBUG, CONFIG
+    global DEBUG, CONFIG, HISTORY_FILE
     config = get_config_data(CONFIG)
     DEBUG = config['debug']
     # regex_param = re.IGNORECASE|re.UNICODE|re.DOTALL
@@ -54,12 +57,15 @@ def main():
         'placementStages': 'FO', '_placementStages': 'on', '_placementStages': 'on',
         'initiatorFullName': '', 'initiatorId': '', 'priceRange': 'H', 'currencyCode': 'RUB', '_smallBisnes': 'on',
         'index': 1, 'sortField': 'lastEventDate', 'descending': 'true', 'tabName': 'FO', 'lotView': 'false', 
-        'pageX': '', 'pageY': ''}
+        'pageX': '', 'pageY': ''
+    }
     # NOTE: encoding - optional for this case
     params['priceRange'] = config['category']
     if DEBUG:
         prepate_url = prepare_func(params)
         print('create url: ' + urls['base'] + prepate_url)
+    # (create) and open DATABASE
+    connect = get_connection(HISTORY_FILE)
     companies = []
     try:
         pageCount, recordCount, page = 0, 0, config['first']
@@ -72,32 +78,47 @@ def main():
             if from_url:
                 ids_str = parser_main_page(regexps['get_ids'], regexps['get_base_page'], from_url)
                 if not ids_str:
-                    print("Erro in page {}".format(page))
+                    print("Error in page {}".format(page))
                     continue
                 for i in ids_str:
+                    # if i in DB, call continue (data in history)
+                    if check_history(connect, i):
+                        print("record {0} already in history".format(i))
+                        continue
                     print("do record number {0}...".format(i))
                     istr = str(i)
                     ones = Zakupki(i, urls['common'], DEBUG)
+                    # read protocol page, find date
                     protocol_page = ones.get_date(urls['protocol'] + istr,regexps['get_date1'], regexps['get_date2'])
                     if ones.necessary_date(config['start'], config['end']):
                         # get winner
-                        ones.get_winner(protocol_page, regexps['get_winner'])
-                        # get sums
-                        ones.get_sums_common(urls['common'] + istr)
-                        ones.get_win_data(urls['searchwin'], request.pathname2url)
-                        # add new record
-                        if ones.garantsum > 0:
-                            companies.append(ones)
+                        onesexist = ones.get_winner(protocol_page, regexps['get_winner'])
+                        if onesexist:
+                            # get sums
+                            ones.get_sums_common(urls['common'] + istr)
+                            if ones.garantsum > 0:
+                                ones.get_win_data(urls['searchwin'], request.pathname2url)
+                                # add new record
+                                companies.append(ones)
+                            elif DEBUG:
+                                print("GarantSum=0")
             else:
                 print("Error getURL or not found data no page={0}".format(page))
             page += 1
+        # save data in sqlite database
+
+        # print result
         print("Finish program, found {0} record for {1} second(s)".format(len(companies), round(time.time() - time_start,2)))
+        # save to history
+        saves = saveInHistory(connect, companies)
+        print_from_db(saves)
         # sorting
         # companies.sort(key=lambda item: item.winner['name'], reverse=True)
         # companies.sort(key=lambda item: item.garantsum, reverse=True)
         # companies.sort(key=lambda item: len(item.winner['urls'])==1, reverse=True)
         # print result in MS Excel file
-        print_result(companies)
+        # print_result(companies)
+        connect.close()
         if osdetect() == 'Windows':
             input("Press any key for close window....")
     except (ValueError, IndexError) as e:

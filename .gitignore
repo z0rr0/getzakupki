@@ -31,5 +31,6 @@ pip-log.txt
 wf
 env/*
 wf*
-# ignore MS Excel
+# ignore MS Excel, SQLite
 *.xls
+*.sqlite
