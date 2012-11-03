@@ -105,19 +105,12 @@ def main():
             else:
                 print("Error getURL or not found data no page={0}".format(page))
             page += 1
-        # save data in sqlite database
-
         # print result
         print("Finish program, found {0} record for {1} second(s)".format(len(companies), round(time.time() - time_start,2)))
         # save to history
         saves = saveInHistory(connect, companies)
+        # read db
         print_from_db(saves)
-        # sorting
-        # companies.sort(key=lambda item: item.winner['name'], reverse=True)
-        # companies.sort(key=lambda item: item.garantsum, reverse=True)
-        # companies.sort(key=lambda item: len(item.winner['urls'])==1, reverse=True)
-        # print result in MS Excel file
-        # print_result(companies)
         connect.close()
         if osdetect() == 'Windows':
             input("Press any key for close window....")
