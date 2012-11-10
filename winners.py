@@ -325,6 +325,9 @@ def saveInHistory(connect, results):
         # save winner
         try:
             for res in results:
+                # check history (second)
+                if check_history(connect, res.id):
+                    continue
                 # default values
                 sql_str = "(`id`,`name`,`url`,`date`,`maxsum`,`garantsum`,`garantMix`,`wurl`,`winner_name`) VALUES (?,?,?,?,?,?,?,?,?)"
                 sql_val = (res.id, res.name, res.url, res.date, res.maxsum, res.garantsum, res.garantMix, res.winner['surls'], res.winner['name'])
@@ -341,11 +344,11 @@ def saveInHistory(connect, results):
             print("SQLite3 error:", er)
         else:
             # read data with sorting
-            prints = print_by_hostory(cur, ids)
+            prints = print_by_history(cur, ids)
     cur.close()
     return prints
 
-def print_by_hostory(cur, ids=None):
+def print_by_history(cur, ids=None):
     """read db, get data by ids"""
     dicts = []
     if ids:

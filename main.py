@@ -105,12 +105,15 @@ def main():
             else:
                 print("Error getURL or not found data no page={0}".format(page))
             page += 1
-        # print result
-        print("Finish program, found {0} record for {1} second(s)".format(len(companies), round(time.time() - time_start,2)))
-        # save to history
-        saves = saveInHistory(connect, companies)
-        # read db
-        print_from_db(saves)
+        if companies:
+            # save to history
+            saves = saveInHistory(connect, companies)
+            # print result
+            print_from_db(saves)
+            print("Finish program, found {0} record(s), save to file {2} ones, for {1} second(s)".format(len(companies), round(time.time() - time_start,2), len(saves)))
+        else:
+            print("Work time {0} second(s)".format(round(time.time() - time_start,2)))
+            print("!!!   Program did not found data   !!!")
         connect.close()
         if osdetect() == 'Windows':
             input("Press any key for close window....")
